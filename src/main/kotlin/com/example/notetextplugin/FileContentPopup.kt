@@ -18,14 +18,41 @@ import com.intellij.ui.SimpleTextAttributes
 class FileContentPopup {
     companion object {
         fun show(editor: Editor, content: String, fileName: String) {
-            val fullContent = "$fileName\n-------------------\n$content"
-            val lines = fullContent.split("\n")
+            // 构建包含文件名和分隔符的完整内容
+            val fullContent = "\n$content"
             
-            val processedLines = if (lines.size > 10) {
-                val firstTenLines = lines.take(10)
-                firstTenLines + "..."
+            // 随机生成10个2-24之间的数字作为每行的字数
+            val charCounts = (1..10).map { (2..24).random() }
+            
+            // 根据字数从内容中提取相应的字符
+            val extractedLines = mutableListOf<String>()
+            var currentIndex = 0
+            
+            for (charCount in charCounts) {
+                if (currentIndex < fullContent.length) {
+                    val remainingLength = fullContent.length - currentIndex
+                    val actualCharCount = minOf(charCount, remainingLength)
+                    val line = fullContent.substring(currentIndex, currentIndex + actualCharCount)
+                    extractedLines.add(line)
+                    currentIndex += actualCharCount
+                }
+            }
+            
+            // 如果提取的行数不足10行，补充空行
+            while (extractedLines.size < 10 && currentIndex < fullContent.length) {
+                val charCount = charCounts[extractedLines.size]
+                val remainingLength = fullContent.length - currentIndex
+                val actualCharCount = minOf(charCount, remainingLength)
+                val line = fullContent.substring(currentIndex, currentIndex + actualCharCount)
+                extractedLines.add(line)
+                currentIndex += actualCharCount
+            }
+            
+            // 处理最后的行，如果还有内容则添加省略号
+            val processedLines = if (currentIndex < fullContent.length) {
+                extractedLines + "..."
             } else {
-                lines
+                extractedLines
             }
             
             val listModel = DefaultListModel<String>()

@@ -44,9 +44,10 @@ class MyToolWindowFactory : ToolWindowFactory {
                         val selectedFile: VirtualFile = chosenFiles[0]
                         filePathField.text = selectedFile.path
                         
-                        // 保存选中的文件路径到服务
+                        // 保存选中的文件路径到服务，并重置内容位置索引
                         val service = project.getService(FileStateService::class.java)
                         service.setFilePath(selectedFile.path)
+                        service.setContentPosition(0)  // 切换文件时清空索引位置
                     }
                 }
             })

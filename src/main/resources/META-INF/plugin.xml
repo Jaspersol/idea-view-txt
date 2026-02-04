@@ -28,5 +28,10 @@
         <toolWindow id="MyToolWindow" factoryClass="com.example.notetextplugin.MyToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>
         <projectService serviceImplementation="com.example.notetextplugin.FileStateService"/>
+        <action id="com.example.notetextplugin.MultiKeyPressAction" class="com.example.notetextplugin.MultiKeyPressAction"
+                text="Show File Content Popup" description="Show the content of the selected file in a popup">
+            <add-to-group group-id="ToolsMenu" anchor="first"/>
+        </action>
+        <editorFactoryListener topic="com.intellij.openapi.editor.event.EditorFactoryListener" implementation="com.example.notetextplugin.KeyTypedListener"/>
     </extensions>
 </idea-plugin>

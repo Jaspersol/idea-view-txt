@@ -176,15 +176,21 @@ class FileContentPopup {
 
             // 坐标计算
             runCatching {
-                val editorComponent = editor.component
                 val caretModel = editor.caretModel
-                val realRelPoint = editor.visualPositionToXY(caretModel.visualPosition).apply {
-                    y += editor.scrollingModel.verticalScrollOffset
-                }
-                val ideaRelativePoint = RelativePoint(editorComponent, realRelPoint)
-                val targetPoint = Point(ideaRelativePoint.point.x + 70, ideaRelativePoint.point.y)
-                popup.showInScreenCoordinates(editorComponent, targetPoint)
+                val visualPos = caretModel.visualPosition
+                val editorComponent = editor.component
+                
+                // 获取光标在编辑器可视区域内的相对坐标
+                val xy = editor.visualPositionToXY(visualPos)
+                
+                // 创建RelativePoint，这是IntelliJ平台推荐的定位方式
+                // 它会自动处理组件层次和多显示器环境
+                val relativePoint = RelativePoint(editorComponent, Point(xy.x + 70, xy.y + 20))
+                
+                // 使用RelativePoint显示弹窗
+                popup.show(relativePoint)
             }.onFailure {
+                // 异常兜底：坐标计算失败时，弹窗显示在编辑器中心，避免不展示
                 popup.showInCenterOf(editor.component)
             }
         }

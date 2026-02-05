@@ -15,7 +15,6 @@ import javax.swing.SwingUtilities
 class KeyTypedListener : EditorFactoryListener {
     companion object {
         private const val PRESS_THRESHOLD = 3
-        private const val TARGET_KEY = KeyEvent.VK_SLASH // '/' key
         private const val RESET_TIMEOUT_MS = 2000 // 2秒超时重置计数
     }
 
@@ -29,7 +28,11 @@ class KeyTypedListener : EditorFactoryListener {
 
         val keyAdapter = object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
-                if (e.keyCode == TARGET_KEY) {
+                // 获取当前设置的快捷键
+                val service = project.getService(FileStateService::class.java)
+                val targetKey = service.popupShortcut
+                
+                if (e.keyCode == targetKey) {
                     val currentTime = System.currentTimeMillis()
                     
                     // 获取当前编辑器的计数和最后按键时间

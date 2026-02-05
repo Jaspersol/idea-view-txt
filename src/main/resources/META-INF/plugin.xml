@@ -8,13 +8,13 @@
     <name>Note Text Plugin</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor url="">makabaka</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
+        <p>这是在IDE内查看文本文件的插件</p>
+        <p>请输入文本</p>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.

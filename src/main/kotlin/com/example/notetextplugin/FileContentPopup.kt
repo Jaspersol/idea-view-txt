@@ -19,6 +19,7 @@ import javax.swing.JLabel
 import javax.swing.JList
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.awt.RelativePoint
+import j.y.Q.c
 
 class FileContentPopup {
     companion object {
@@ -39,38 +40,29 @@ class FileContentPopup {
                 }
             }
 
-            // 初始化内容将通过updateContent函数完成
-
             // 创建列表模型和列表
             val listModel = DefaultListModel<String>()
             val list = JBList(listModel)
 
             // 定义翻页函数
-            fun updateContent(startPos: Int) {
+            fun updateContent(startPos: Int, charCounts: List<Int>) {
                 // 确保起始位置在有效范围内
-                var adjustedStartPos = startPos
-                if (adjustedStartPos < 0) adjustedStartPos = 0
-                if (adjustedStartPos > originalFullContent.length) {
-                    adjustedStartPos = originalFullContent.length
+                var currentIndex = startPos
+                if (currentIndex < 0) currentIndex = 0
+                if (currentIndex > originalFullContent.length) {
+                    currentIndex = originalFullContent.length
                 }
 
                 // 更新当前起始位置
-                currentStartPosition = adjustedStartPos
-                var currentIndex = adjustedStartPos
                 val extractedLines = mutableListOf<String>()
-
-                // 每次翻页都重新生成10个2-24之间的数字作为每行的字数
-                val charCounts = (1..10).map { (2..24).random() }
 
                 // 重新加载数据
                 for (charCount in charCounts) {
-                    if (currentIndex < originalFullContent.length) {
-                        val remainingLength = originalFullContent.length - currentIndex
-                        val actualCharCount = minOf(charCount, remainingLength)
-                        val line = originalFullContent.substring(currentIndex, currentIndex + actualCharCount)
-                        extractedLines.add(line)
-                        currentIndex += actualCharCount
-                    }
+                    val remainingLength = originalFullContent.length - currentIndex
+                    val actualCharCount = minOf(charCount, remainingLength)
+                    val line = originalFullContent.substring(currentIndex, currentIndex + actualCharCount)
+                    extractedLines.add(line)
+                    currentIndex += actualCharCount
                 }
 
                 // 如果提取的行数不足10行，补充空行
@@ -100,9 +92,12 @@ class FileContentPopup {
                 if (project != null) {
                     val service = project.getService(FileStateService::class.java)
                     // 存储当前的起始位置
-                    service.setContentPosition(adjustedStartPos)
+                    service.setContentPosition(currentIndex)
                 }
             }
+
+            // 初始化内容
+            updateContent(currentStartPosition, (1..10).map { (5..24).random() })
 
             // 自定义渲染器以显示图标
             list.cellRenderer = object : ColoredListCellRenderer<String>() {
@@ -119,7 +114,7 @@ class FileContentPopup {
                         append("...", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     } else {
                         // 随机选择文件类型图标
-                        val fileTypes = listOf(".txt", ".js", ".jpg", ".gitignore", ".json", "iml")
+                        val fileTypes = listOf(".txt", ".js", ".jpg", ".gitignore", ".json")
                         val randomExt = fileTypes.random()
                         val fileType = FileTypeManager.getInstance().getFileTypeByExtension(randomExt.substring(1))
                         icon = fileType.icon
@@ -141,27 +136,29 @@ class FileContentPopup {
                 add(scrollPane)
             }
 
-            // 初始化内容
-            updateContent(currentStartPosition)
-
             // 添加鼠标滚轮监听器实现翻页
+            var lastPageSize = 0
+            var lastCharCounts = emptyList<Int>()
             list.addMouseWheelListener { e ->
-                // 每次翻页都重新计算pageSize（但不会使用，因为每行长度都是随机的）
-                val charCounts = (1..10).map { (2..24).random() }
-                val pageSize = charCounts.sum()
-
-                // 计算新的起始位置
-                val newStartPos = if (e.wheelRotation > 0) {
-                    // 向下滚动：向前翻页
-                    minOf(currentStartPosition + pageSize, originalFullContent.length)
+                // 区分下翻（前进）和上翻（回退），复用/生成步长
+                val (newPageSize, newCharCounts) = if (e.wheelRotation > 0) {
+                    // 向下滚动：向后翻页 → 重新生成随机步长，并保存为“上一次步长”
+                    val charCounts = (1..10).map { (5..24).random() }
+                    val pageSize = charCounts.sum()
+                    lastPageSize = pageSize
+                    lastCharCounts = charCounts
+                    Pair(pageSize, charCounts)
                 } else {
-                    // 向上滚动：向后翻页
-                    maxOf(currentStartPosition - pageSize, 0)
+                    // 向上滚动：向前翻页 → 复用上一次下翻的步长，不重新生成
+                    Pair(lastPageSize, lastCharCounts)
                 }
 
-                // 只有当起始位置发生变化时才更新内容
-                if (newStartPos != currentStartPosition) {
-                    updateContent(newStartPos)
+                if (e.wheelRotation > 0) {
+                    updateContent(currentStartPosition, newCharCounts)
+                    currentStartPosition = currentStartPosition + newPageSize
+                } else {
+                    updateContent(currentStartPosition - 2 * newPageSize, newCharCounts)
+                    currentStartPosition = currentStartPosition - newPageSize
                 }
 
                 e.consume()
@@ -189,11 +186,6 @@ class FileContentPopup {
                 popup.showInScreenCoordinates(editorComponent, targetPoint)
             }.onFailure {
                 popup.showInCenterOf(editor.component)
-            }
-            // 更新存储的内容位置
-            if (project != null) {
-                val service = project.getService(FileStateService::class.java)
-                service.setContentPosition(currentStartPosition)
             }
         }
     }

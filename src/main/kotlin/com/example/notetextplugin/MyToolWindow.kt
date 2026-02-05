@@ -89,6 +89,58 @@ class MyToolWindowFactory : ToolWindowFactory {
                 }
             }
             
+            // 添加手动指定索引功能
+            val indexLabel = JBLabel("当前索引：")
+            val indexField = JBTextField("")
+            indexField.preferredSize = Dimension(100, indexField.preferredSize.height)
+            
+            // 从服务加载当前索引位置并显示
+            val currentIndex = service.getContentPosition()
+            indexField.text = currentIndex.toString()
+            
+            // 添加刷新按钮，用于同步弹窗中更新的索引位置
+            val refreshIndexButton = JButton("刷新").apply {
+                addActionListener {
+                    // 从服务重新加载当前索引位置
+                    val latestIndex = service.getContentPosition()
+                    indexField.text = latestIndex.toString()
+                }
+            }
+            
+            val setIndexButton = JButton("更新索引").apply {
+                addActionListener {
+                    try {
+                        val newIndex = indexField.text.toInt()
+                        if (newIndex >= 0) {
+                            // 保存新的索引位置到服务
+                            service.setContentPosition(newIndex)
+                            
+                            // 显示成功消息
+                            Messages.showMessageDialog(
+                                project,
+                                "索引已更新为: $newIndex",
+                                "设置成功",
+                                Messages.getInformationIcon()
+                            )
+                        } else {
+                            Messages.showMessageDialog(
+                                project,
+                                "索引值必须大于等于0",
+                                "输入错误",
+                                Messages.getWarningIcon()
+                            )
+                        }
+                    } catch (e: NumberFormatException) {
+                        Messages.showMessageDialog(
+                            project,
+                            "请输入有效的数字",
+                            "输入错误",
+                            Messages.getWarningIcon()
+                        )
+                    }
+                }
+            }
+            
             add(label)
             add(filePathField)
             add(JButton("浏览").apply {
@@ -113,6 +165,12 @@ class MyToolWindowFactory : ToolWindowFactory {
             add(shortcutLabel)
             add(shortcutComboBox)
             add(setShortcutButton)
+            
+            // 添加手动指定索引组件
+            add(indexLabel)
+            add(indexField)
+            add(refreshIndexButton)
+            add(setIndexButton)
         }
 
         fun getContent(): JBPanel<JBPanel<*>> = content

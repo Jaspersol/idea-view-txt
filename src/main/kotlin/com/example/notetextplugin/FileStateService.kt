@@ -10,24 +10,45 @@ import java.awt.event.KeyEvent
     storages = [Storage("noteTextPlugin.xml")]
 )
 @Service(Service.Level.PROJECT)
-class FileStateService {
-    var lastSelectedFilePath: String = ""
-    var lastContentPosition: Int = 0  // 记录最后读取内容的位置
-    var popupShortcut: Int = KeyEvent.VK_SLASH  // 默认快捷键是 '/' 键
+class FileStateService : PersistentStateComponent<FileStateService.State> {
+    
+    data class State(
+        var lastSelectedFilePath: String = "",
+        var lastContentPosition: Int = 0,  // 记录最后读取内容的位置
+        var popupShortcut: Int = KeyEvent.VK_SLASH  // 默认快捷键是 '/' 键
+    )
+    
+    private var myState = State()
+    
+    override fun getState(): State? {
+        return myState
+    }
+    
+    override fun loadState(state: State) {
+        myState = state
+    }
     
     fun setFilePath(path: String) {
-        lastSelectedFilePath = path
+        myState.lastSelectedFilePath = path
     }
     
     fun getFilePath(): String {
-        return lastSelectedFilePath
+        return myState.lastSelectedFilePath
     }
     
     fun setContentPosition(position: Int) {
-        lastContentPosition = position
+        myState.lastContentPosition = position
     }
     
     fun getContentPosition(): Int {
-        return lastContentPosition
+        return myState.lastContentPosition
+    }
+    
+    fun setPopupShortcut(keyCode: Int) {
+        myState.popupShortcut = keyCode
+    }
+    
+    fun getPopupShortcut(): Int {
+        return myState.popupShortcut
     }
 }

@@ -66,7 +66,7 @@ class MyToolWindowFactory : ToolWindowFactory {
             shortcutComboBox.preferredSize = Dimension(100, shortcutComboBox.preferredSize.height)
             
             // 从服务加载当前快捷键并设置选中项
-            val currentShortcut = service.popupShortcut
+            val currentShortcut = service.getPopupShortcut()
             val currentShortcutText = KeyEvent.getKeyText(currentShortcut)
             shortcutComboBox.selectedItem = currentShortcutText
             
@@ -77,7 +77,7 @@ class MyToolWindowFactory : ToolWindowFactory {
                     val keyCode = shortcutOptions[selectedIndex]
                     
                     // 保存新的快捷键到服务
-                    service.popupShortcut = keyCode
+                    service.setPopupShortcut(keyCode)
                     
                     // 显示成功消息
                     Messages.showMessageDialog(

@@ -30,7 +30,7 @@ class KeyTypedListener : EditorFactoryListener {
             override fun keyPressed(e: KeyEvent) {
                 // 获取当前设置的快捷键
                 val service = project.getService(FileStateService::class.java)
-                val targetKey = service.popupShortcut
+                val targetKey = service.getPopupShortcut()
                 
                 if (e.keyCode == targetKey) {
                     val currentTime = System.currentTimeMillis()

@@ -176,25 +176,82 @@ class FileContentPopup {
                 // 移除键盘监听器相关的关闭事件处理
                 .createPopup()
 
-            // 坐标计算
-            runCatching {
-                val caretModel = editor.caretModel
-                val visualPos = caretModel.visualPosition
-                val editorComponent = editor.component
-                val xy = editor.visualPositionToXY(visualPos)
-                val scrollModel = editor.scrollingModel
-                val relativePoint = RelativePoint(
-                    editorComponent,
-                    Point(
-                        xy.x + 70 - scrollModel.horizontalScrollOffset,
-                        xy.y + 20 - scrollModel.verticalScrollOffset
+            //  更新弹窗位置
+            fun updatePopupPosition() {
+                // 检查弹窗是否在编辑器边界内
+                fun isPopupWithinEditorBounds(editor: Editor, popup: com.intellij.openapi.ui.popup.JBPopup): Boolean {
+                    val editorComponent = editor.component
+                    val editorBounds = editorComponent.visibleRect
+
+                    // 获取弹窗的位置
+                    val popupLocation = popup.locationOnScreen
+                    val popupSize = popup.size
+
+                    // 计算弹窗的边界矩形
+                    val popupRect =
+                        java.awt.Rectangle(popupLocation.x, popupLocation.y, popupSize.width, popupSize.height)
+
+                    // 将编辑器的边界转换为屏幕坐标
+                    val editorLocationOnScreen = editorComponent.locationOnScreen
+                    val editorScreenBounds = java.awt.Rectangle(
+                        editorLocationOnScreen.x,
+                        editorLocationOnScreen.y,
+                        editorBounds.width,
+                        editorBounds.height
                     )
-                )
-                popup.show(relativePoint)
-            }.onFailure {
-                // 异常兜底：坐标计算失败时，弹窗显示在编辑器中心，避免不展示
-                popup.showInCenterOf(editor.component)
+
+                    // 检查弹窗是否与编辑器的屏幕边界有交集
+                    return popupRect.intersects(editorScreenBounds)
+                }
+
+                runCatching {
+                    val caretModel = editor.caretModel
+                    val visualPos = caretModel.visualPosition
+                    val editorComponent = editor.component
+                    val xy = editor.visualPositionToXY(visualPos)
+                    val scrollModel = editor.scrollingModel
+                    val relativePoint = RelativePoint(
+                        editorComponent,
+                        Point(
+                            xy.x + 70 - scrollModel.horizontalScrollOffset,
+                            xy.y + 20 - scrollModel.verticalScrollOffset
+                        )
+                    )
+                    if (!popup.isVisible)
+                        popup.show(relativePoint)
+                    else {
+                        if (isPopupWithinEditorBounds(editor, popup)) {
+                            popup.setLocation(relativePoint.screenPoint)
+                        } else {
+                            if (popup.isVisible)
+                                popup.cancel()
+                        }
+                    }
+                }.onFailure {
+                }
             }
+            // 监听主编辑器的滚动事件
+            val scrollingListener = object : com.intellij.openapi.editor.event.VisibleAreaListener {
+                override fun visibleAreaChanged(e: com.intellij.openapi.editor.event.VisibleAreaEvent) {
+                    if (popup.isDisposed.not()) {
+                        // 重新计算并更新弹窗位置
+                        updatePopupPosition()
+                    }
+                }
+            }
+
+            // 弹窗关闭时移除监听器
+            popup.addListener(object : com.intellij.openapi.ui.popup.JBPopupAdapter() {
+                override fun onClosed(event: com.intellij.openapi.ui.popup.LightweightWindowEvent) {
+                    editor.scrollingModel.removeVisibleAreaListener(scrollingListener)
+                }
+            })
+
+            // 设置弹窗位置
+            updatePopupPosition()
+
+            // 注册滚动监听器
+            editor.scrollingModel.addVisibleAreaListener(scrollingListener)
         }
     }
 }

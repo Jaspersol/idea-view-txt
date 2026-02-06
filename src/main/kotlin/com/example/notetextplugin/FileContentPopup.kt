@@ -25,7 +25,7 @@ class FileContentPopup {
     companion object {
         fun show(editor: Editor, content: String, fileName: String) {
             // 创建一个包含原始内容的变量，用于翻页功能
-            val originalFullContent = "\n$content"
+            val originalFullContent = content
 
             // 从FileStateService获取上次的位置，如果没有则使用0
             var currentStartPosition = 0
@@ -87,13 +87,6 @@ class FileContentPopup {
                 processedLines.forEach { line ->
                     listModel.addElement(line)
                 }
-
-                // 更新存储的索引位置
-                if (project != null) {
-                    val service = project.getService(FileStateService::class.java)
-                    // 存储当前的起始位置
-                    service.setContentPosition(currentIndex)
-                }
             }
 
             // 初始化内容
@@ -137,8 +130,9 @@ class FileContentPopup {
             }
 
             // 添加鼠标滚轮监听器实现翻页
-            var lastPageSize = 0
-            var lastCharCounts = emptyList<Int>()
+            var lastCharCounts = (1..10).map { (5..24).random() }
+            var lastPageSize = lastCharCounts.sum()
+            currentStartPosition = currentStartPosition + lastPageSize
             list.addMouseWheelListener { e ->
                 // 区分下翻（前进）和上翻（回退），复用/生成步长
                 val (newPageSize, newCharCounts) = if (e.wheelRotation > 0) {
@@ -161,6 +155,21 @@ class FileContentPopup {
                     currentStartPosition = currentStartPosition - newPageSize
                 }
 
+                // 避免越界
+                if (currentStartPosition < 0) {
+                    currentStartPosition = 0
+                }
+                if (currentStartPosition > originalFullContent.length) {
+                    currentStartPosition = originalFullContent.length
+                }
+
+                // 更新存储的索引位置
+                if (project != null) {
+                    val service = project.getService(FileStateService::class.java)
+                    // 存储当前的起始位置
+                    service.setContentPosition(currentStartPosition)
+                }
+
                 e.consume()
             }
 
@@ -179,14 +188,14 @@ class FileContentPopup {
                 val caretModel = editor.caretModel
                 val visualPos = caretModel.visualPosition
                 val editorComponent = editor.component
-                
+
                 // 获取光标在编辑器可视区域内的相对坐标
                 val xy = editor.visualPositionToXY(visualPos)
-                
+
                 // 创建RelativePoint，这是IntelliJ平台推荐的定位方式
                 // 它会自动处理组件层次和多显示器环境
                 val relativePoint = RelativePoint(editorComponent, Point(xy.x + 70, xy.y + 20))
-                
+
                 // 使用RelativePoint显示弹窗
                 popup.show(relativePoint)
             }.onFailure {

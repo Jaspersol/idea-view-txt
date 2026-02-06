@@ -90,17 +90,9 @@ class KeyTypedListener : EditorFactoryListener {
         try {
             val content = String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(selectedFilePath)))
             val fileName = file.name
-            
-            // 从存储的位置开始读取内容
-            val startPosition = service.getContentPosition()
-            val adjustedContent = if (startPosition < content.length) {
-                content.substring(startPosition)
-            } else {
-                content  // 如果位置超出范围，返回完整内容
-            }
-            
+
             // 显示弹窗
-            FileContentPopup.show(editor, adjustedContent, fileName)
+            FileContentPopup.show(editor, content, fileName)
             
         } catch (ex: Exception) {
             ex.printStackTrace()

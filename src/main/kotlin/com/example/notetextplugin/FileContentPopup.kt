@@ -1,25 +1,18 @@
 package com.example.notetextplugin
 
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.EditorCoreUtil
 import com.intellij.openapi.fileTypes.FileTypeManager
-import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.ui.popup.JBPopupAdapter
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.openapi.ui.popup.LightweightWindowEvent
 import com.intellij.ui.ColoredListCellRenderer
+import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.util.ui.JBUI
 import java.awt.Dimension
 import java.awt.Point
 import javax.swing.DefaultListModel
-import javax.swing.JLabel
 import javax.swing.JList
-import com.intellij.ui.SimpleTextAttributes
-import com.intellij.ui.awt.RelativePoint
-import j.y.Q.c
 
 class FileContentPopup {
     companion object {
@@ -188,15 +181,15 @@ class FileContentPopup {
                 val caretModel = editor.caretModel
                 val visualPos = caretModel.visualPosition
                 val editorComponent = editor.component
-
-                // 获取光标在编辑器可视区域内的相对坐标
                 val xy = editor.visualPositionToXY(visualPos)
-
-                // 创建RelativePoint，这是IntelliJ平台推荐的定位方式
-                // 它会自动处理组件层次和多显示器环境
-                val relativePoint = RelativePoint(editorComponent, Point(xy.x + 70, xy.y + 20))
-
-                // 使用RelativePoint显示弹窗
+                val scrollModel = editor.scrollingModel
+                val relativePoint = RelativePoint(
+                    editorComponent,
+                    Point(
+                        xy.x + 70 - scrollModel.horizontalScrollOffset,
+                        xy.y + 20 - scrollModel.verticalScrollOffset
+                    )
+                )
                 popup.show(relativePoint)
             }.onFailure {
                 // 异常兜底：坐标计算失败时，弹窗显示在编辑器中心，避免不展示

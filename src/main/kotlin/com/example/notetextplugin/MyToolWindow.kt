@@ -1,9 +1,8 @@
 package com.example.notetextplugin
 
-import com.intellij.ide.util.PropertiesComponent
-import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
@@ -11,12 +10,10 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.content.ContentFactory
-import com.intellij.openapi.ui.Messages
-import javax.swing.JButton
-import javax.swing.JComboBox
 import java.awt.Dimension
 import java.awt.event.KeyEvent
-import kotlin.random.Random
+import javax.swing.JButton
+import javax.swing.JComboBox
 
 class MyToolWindowFactory : ToolWindowFactory {
     override fun shouldBeAvailable(project: Project) = true

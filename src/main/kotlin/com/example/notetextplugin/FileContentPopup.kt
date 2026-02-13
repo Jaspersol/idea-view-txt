@@ -210,18 +210,55 @@ class FileContentPopup {
                     val editorComponent = editor.component
                     val xy = editor.visualPositionToXY(visualPos)
                     val scrollModel = editor.scrollingModel
-                    val relativePoint = RelativePoint(
+                    
+                    // 获取屏幕尺寸信息
+                    val screenSize = java.awt.Toolkit.getDefaultToolkit().screenSize
+                    val screenBounds = editorComponent.graphicsConfiguration.bounds
+                    val actualScreenWidth = screenBounds.width
+                    val actualScreenY = screenBounds.y
+                    
+                    // 先创建弹窗以获取其尺寸
+                    if (!popup.isVisible) {
+                        popup.show(RelativePoint.getNorthWestOf(editorComponent))
+                    }
+                    
+                    // 获取弹窗的实际尺寸
+                    val popupWidth = popup.size.width
+                    val popupHeight = popup.size.height
+                    
+                    // 计算相对于编辑器组件的光标位置
+                    val cursorX = xy.x - scrollModel.horizontalScrollOffset
+                    val cursorY = xy.y - scrollModel.verticalScrollOffset
+                    
+                    // 计算弹窗应该出现的位置（在光标右下角）
+                    var popupX = cursorX + 70  // 在光标右侧20像素
+                    var popupY = cursorY + 20  // 在光标下方20像素
+                    
+                    // 检查是否超出屏幕右边界
+                    if (popupX + popupWidth > actualScreenWidth) {
+                        popupX = maxOf(0, cursorX - popupWidth)  // 放到光标左侧
+                    }
+                    
+                    // 检查是否超出屏幕底部
+                    if (popupY + popupHeight > screenSize.height) {
+                        popupY = maxOf(0, cursorY - popupHeight - 20)  // 放到光标上方
+                    }
+                    
+                    // 确保弹窗不会超出屏幕左边界
+                    if (popupX < 0) popupX = 0
+                    // 确保弹窗不会超出屏幕上边界
+                    if (popupY < 0) popupY = 0
+                    
+                    val adjustedPoint = RelativePoint(
                         editorComponent,
-                        Point(
-                            xy.x + 70 - scrollModel.horizontalScrollOffset,
-                            xy.y + 20 - scrollModel.verticalScrollOffset
-                        )
+                        Point(popupX, popupY)
                     )
-                    if (!popup.isVisible)
-                        popup.show(relativePoint)
-                    else {
+                    
+                    if (!popup.isVisible) {
+                        popup.show(adjustedPoint)
+                    } else {
                         if (isPopupWithinEditorBounds(editor, popup)) {
-                            popup.setLocation(relativePoint.screenPoint)
+                            popup.setLocation(adjustedPoint.screenPoint)
                         } else {
                             if (popup.isVisible)
                                 popup.cancel()

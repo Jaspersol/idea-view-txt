@@ -9,8 +9,11 @@ import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.colors.FontPreferences
 import java.awt.Dimension
 import java.awt.Point
+import java.awt.Font
 import javax.swing.DefaultListModel
 import javax.swing.JList
 
@@ -83,7 +86,14 @@ class FileContentPopup {
             }
 
             // 初始化内容
-            updateContent(currentStartPosition, (1..10).map { (5..24).random() })
+            updateContent(currentStartPosition, (1..10).map { (10..24).random() })
+
+            // 获取IDEA编辑器的字体设置
+            val editorColorsManager = EditorColorsManager.getInstance()
+            val fontPreferences = editorColorsManager.globalScheme.fontPreferences
+            val fontSize = fontPreferences.getSize(FontPreferences.DEFAULT_FONT_NAME)
+            val fontFamily = fontPreferences.fontFamily
+            val customFont = Font(fontFamily, Font.PLAIN, fontSize)
 
             // 自定义渲染器以显示图标
             list.cellRenderer = object : ColoredListCellRenderer<String>() {
@@ -106,6 +116,9 @@ class FileContentPopup {
                         icon = fileType.icon
                         append(value ?: "")
                     }
+
+                    // 应用IDEA编辑器的字体设置
+                    font = customFont
                 }
             }
 
@@ -123,14 +136,14 @@ class FileContentPopup {
             }
 
             // 添加鼠标滚轮监听器实现翻页
-            var lastCharCounts = (1..10).map { (5..24).random() }
+            var lastCharCounts = (1..10).map { (10..24).random() }
             var lastPageSize = lastCharCounts.sum()
             currentStartPosition = currentStartPosition + lastPageSize
             list.addMouseWheelListener { e ->
                 // 区分下翻（前进）和上翻（回退），复用/生成步长
                 val (newPageSize, newCharCounts) = if (e.wheelRotation > 0) {
                     // 向下滚动：向后翻页 → 重新生成随机步长，并保存为“上一次步长”
-                    val charCounts = (1..10).map { (5..24).random() }
+                    val charCounts = (1..10).map { (10..24).random() }
                     val pageSize = charCounts.sum()
                     lastPageSize = pageSize
                     lastCharCounts = charCounts

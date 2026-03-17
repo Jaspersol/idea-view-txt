@@ -168,6 +168,64 @@ class MyToolWindowFactory : ToolWindowFactory {
             add(indexField)
             add(refreshIndexButton)
             add(setIndexButton)
+            
+            // 添加弹窗宽高设置组件
+            val widthLabel = JBLabel("弹窗宽度：")
+            val widthField = JBTextField("")
+            widthField.preferredSize = Dimension(100, widthField.preferredSize.height)
+            
+            val heightLabel = JBLabel("弹窗高度：")
+            val heightField = JBTextField("")
+            heightField.preferredSize = Dimension(100, heightField.preferredSize.height)
+            
+            // 从服务加载当前宽高设置并显示
+            val currentWidth = service.getPopupWidth()
+            val currentHeight = service.getPopupHeight()
+            widthField.text = currentWidth.toString()
+            heightField.text = currentHeight.toString()
+            
+            val setSizeButton = JButton("设置宽高").apply {
+                addActionListener {
+                    try {
+                        val newWidth = widthField.text.toInt()
+                        val newHeight = heightField.text.toInt()
+                        if (newWidth > 0 && newHeight > 0) {
+                            // 保存新的宽高设置到服务
+                            service.setPopupWidth(newWidth)
+                            service.setPopupHeight(newHeight)
+                            
+                            // 显示成功消息
+                            Messages.showMessageDialog(
+                                project,
+                                "弹窗宽高已设置为: ${newWidth}x${newHeight}",
+                                "设置成功",
+                                Messages.getInformationIcon()
+                            )
+                        } else {
+                            Messages.showMessageDialog(
+                                project,
+                                "宽高值必须大于0",
+                                "输入错误",
+                                Messages.getWarningIcon()
+                            )
+                        }
+                    } catch (e: NumberFormatException) {
+                        Messages.showMessageDialog(
+                            project,
+                            "请输入有效的数字",
+                            "输入错误",
+                            Messages.getWarningIcon()
+                        )
+                    }
+                }
+            }
+            
+            // 添加宽高设置组件
+            add(widthLabel)
+            add(widthField)
+            add(heightLabel)
+            add(heightField)
+            add(setSizeButton)
         }
 
         fun getContent(): JBPanel<JBPanel<*>> = content

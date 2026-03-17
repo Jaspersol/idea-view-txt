@@ -23,12 +23,16 @@ class FileContentPopup {
             // 创建一个包含原始内容的变量，用于翻页功能
             val originalFullContent = content
 
-            // 从FileStateService获取上次的位置，如果没有则使用0
+            // 从FileStateService获取上次的位置和宽高设置
             var currentStartPosition = 0
+            var popupWidth = 400
+            var popupHeight = 300
             val project = editor.project
             if (project != null) {
                 val service = project.getService(FileStateService::class.java)
                 currentStartPosition = service.getContentPosition()
+                popupWidth = service.getPopupWidth()
+                popupHeight = service.getPopupHeight()
                 // 确保位置在有效范围内
                 if (currentStartPosition < 0) currentStartPosition = 0
                 if (currentStartPosition > originalFullContent.length) {
@@ -123,10 +127,10 @@ class FileContentPopup {
             }
 
             // 设置列表首选大小
-            list.preferredSize = Dimension(400, 300)
+            list.preferredSize = Dimension(popupWidth, popupHeight)
 
             val scrollPane = JBScrollPane(list)
-            scrollPane.preferredSize = Dimension(380, 280)
+            scrollPane.preferredSize = Dimension(popupWidth - 20, popupHeight - 20)
             scrollPane.verticalScrollBarPolicy = JBScrollPane.VERTICAL_SCROLLBAR_NEVER
             scrollPane.horizontalScrollBarPolicy = JBScrollPane.HORIZONTAL_SCROLLBAR_NEVER
 

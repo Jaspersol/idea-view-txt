@@ -15,7 +15,9 @@ class FileStateService : PersistentStateComponent<FileStateService.State> {
     data class State(
         var lastSelectedFilePath: String = "",
         var lastContentPosition: Int = 0,  // 记录最后读取内容的位置
-        var popupShortcut: Int = KeyEvent.VK_SLASH  // 默认快捷键是 '/' 键
+        var popupShortcut: Int = KeyEvent.VK_SLASH,  // 默认快捷键是 '/' 键
+        var popupWidth: Int = 400,  // 默认弹窗宽度
+        var popupHeight: Int = 300  // 默认弹窗高度
     )
     
     private var myState = State()
@@ -50,5 +52,21 @@ class FileStateService : PersistentStateComponent<FileStateService.State> {
     
     fun getPopupShortcut(): Int {
         return myState.popupShortcut
+    }
+    
+    fun setPopupWidth(width: Int) {
+        myState.popupWidth = width
+    }
+    
+    fun getPopupWidth(): Int {
+        return myState.popupWidth
+    }
+    
+    fun setPopupHeight(height: Int) {
+        myState.popupHeight = height
+    }
+    
+    fun getPopupHeight(): Int {
+        return myState.popupHeight
     }
 }

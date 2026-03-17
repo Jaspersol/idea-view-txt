@@ -29,7 +29,7 @@ class MyToolWindowFactory : ToolWindowFactory {
         private val content = JBPanel<JBPanel<*>>().apply {
             layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT)
             val label = JBLabel("选择文件：")
-            filePathField.isEditable = false  // 只读模式，防止直接编辑路径
+            filePathField.isEditable = true  // 允许直接编辑路径
             
             // 初始化时从服务加载上次保存的路径
             val service = project.getService(FileStateService::class.java)
@@ -154,6 +154,34 @@ class MyToolWindowFactory : ToolWindowFactory {
                         val service = project.getService(FileStateService::class.java)
                         service.setFilePath(selectedFile.path)
                         service.setContentPosition(0)  // 切换文件时清空索引位置
+                    }
+                }
+            })
+            
+            // 添加保存路径按钮
+            add(JButton("保存路径").apply {
+                addActionListener {
+                    val newPath = filePathField.text
+                    if (newPath.isNotEmpty()) {
+                        // 保存新的文件路径到服务，并重置内容位置索引
+                        val service = project.getService(FileStateService::class.java)
+                        service.setFilePath(newPath)
+                        service.setContentPosition(0)  // 切换文件时清空索引位置
+                        
+                        // 显示成功消息
+                        Messages.showMessageDialog(
+                            project,
+                            "路径已保存：$newPath",
+                            "保存成功",
+                            Messages.getInformationIcon()
+                        )
+                    } else {
+                        Messages.showMessageDialog(
+                            project,
+                            "路径不能为空",
+                            "输入错误",
+                            Messages.getWarningIcon()
+                        )
                     }
                 }
             })

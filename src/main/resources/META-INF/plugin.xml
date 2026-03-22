@@ -1,11 +1,11 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN, cannot be changed between the plugin versions. -->
-    <id>com.example.note-text-plugin</id>
+    <id>com.example.view-txt</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>Note Text Plugin</name>
+    <name>View Txt</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
     <vendor url="">makabaka</vendor>
@@ -13,8 +13,7 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        <p>这是在IDE内查看文本文件的插件</p>
-        <p>请输入文本</p>
+        <p>ide内快捷查看文本文件</p>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.
@@ -25,13 +24,13 @@
     <!-- Extensions defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="MyToolWindow" factoryClass="com.example.notetextplugin.MyToolWindowFactory"
+        <toolWindow id="MyToolWindow" factoryClass="com.example.viewtxt.MyToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>
-        <projectService serviceImplementation="com.example.notetextplugin.FileStateService"/>
-        <action id="com.example.notetextplugin.MultiKeyPressAction" class="com.example.notetextplugin.MultiKeyPressAction"
+        <projectService serviceImplementation="com.example.viewtxt.FileStateService"/>
+        <action id="com.example.viewtxt.MultiKeyPressAction" class="com.example.viewtxt.MultiKeyPressAction"
                 text="Show File Content Popup" description="Show the content of the selected file in a popup">
             <add-to-group group-id="ToolsMenu" anchor="first"/>
         </action>
-        <editorFactoryListener topic="com.intellij.openapi.editor.event.EditorFactoryListener" implementation="com.example.notetextplugin.KeyTypedListener"/>
+        <editorFactoryListener topic="com.intellij.openapi.editor.event.EditorFactoryListener" implementation="com.example.viewtxt.KeyTypedListener"/>
     </extensions>
 </idea-plugin>

@@ -1,4 +1,4 @@
-package com.example.notetextplugin
+package com.example.viewtxt
 
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.Nls

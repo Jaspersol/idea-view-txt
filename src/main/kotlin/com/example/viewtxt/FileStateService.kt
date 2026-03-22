@@ -1,4 +1,4 @@
-package com.example.notetextplugin
+package com.example.viewtxt
 
 import com.intellij.openapi.components.*
 import com.intellij.openapi.project.Project
@@ -7,7 +7,7 @@ import java.awt.event.KeyEvent
 
 @State(
     name = "FileStateService",
-    storages = [Storage("noteTextPlugin.xml")]
+    storages = [Storage("viewTxt.xml")]
 )
 @Service(Service.Level.PROJECT)
 class FileStateService : PersistentStateComponent<FileStateService.State> {

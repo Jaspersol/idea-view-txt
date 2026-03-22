@@ -1,1 +1,1 @@
-rootProject.name = "note-text-plugin"
+rootProject.name = "View Txt"

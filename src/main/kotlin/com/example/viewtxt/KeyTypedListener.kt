@@ -1,4 +1,4 @@
-package com.example.notetextplugin
+package com.example.viewtxt
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor

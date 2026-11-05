@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.png" width="120" alt="View Txt logo">
+
 # View Txt
 
 ### Read a reference file in a popup beside your caret — without leaving the editor

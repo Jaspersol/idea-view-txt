@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.png" width="120" alt="View Txt logo">
+
 # View Txt
 
 ### 在光标旁的弹窗里看参考文件 —— 不必离开编辑器

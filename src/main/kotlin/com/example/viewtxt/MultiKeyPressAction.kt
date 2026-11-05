@@ -60,7 +60,7 @@ class MultiKeyPressAction : AnAction() {
         } catch (ex: Exception) {
             Messages.showMessageDialog(
                 project,
-                "读取文件时出错: \${ex.message}",
+                "读取文件时出错: ${ex.message}",
                 "读取错误",
                 Messages.getErrorIcon(),
             )

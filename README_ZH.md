@@ -6,7 +6,7 @@
 
 **连按三次 `/`，就会在光标处把工具窗口里登记的那个文本文件显示成一页浮层。滚轮翻页，进度按项目记忆。**
 
-[![Platform](https://img.shields.io/badge/platform-IntelliJ%20IDEA%202025.2%2B-lightgrey.svg)](#环境要求)
+[![Platform](https://img.shields.io/badge/platform-IntelliJ%20IDEA%202024.1%2B-lightgrey.svg)](#环境要求)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF.svg)](https://kotlinlang.org/)
 [![Gradle](https://img.shields.io/badge/build-Gradle%20IntelliJ%20Platform%202.10-02303A.svg)](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
 [![License](https://img.shields.io/badge/license-not%20set-lightgrey.svg)](#许可)
@@ -28,8 +28,8 @@
 
 ## 环境要求
 
-- **IntelliJ IDEA 2025.2 及以上** —— `sinceBuild = 252.25557`，开发基线 `2025.2.4`
-- **JDK 21** —— 源码与目标字节码都是
+- **IntelliJ IDEA 2024.1 及以上** —— `sinceBuild = 241`，开发基线 `2024.1.7`
+- **JDK 17** —— 源码与目标字节码都是
 - **Gradle 9** —— 用仓库自带的 wrapper（`gradle-9.0.0`），无需本地安装
 
 ## 快速开始
@@ -127,7 +127,7 @@
 
 Kotlin 风格取自 `.editorconfig` 里的 `intellij_idea` 代码风格，由 ktlint 强制执行。
 
-**技术栈**：Kotlin 2.1 · IntelliJ Platform Gradle Plugin 2.10 · IntelliJ IDEA 2025.2 API · Swing / JB 组件 · ktlint
+**技术栈**：Kotlin 2.1 · IntelliJ Platform Gradle Plugin 2.10 · IntelliJ IDEA 2024.1 API · Swing / JB 组件 · ktlint
 
 ## 许可
 

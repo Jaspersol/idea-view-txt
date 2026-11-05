@@ -6,7 +6,7 @@
 
 **The triple-tap of `/` opens the text file you registered in the tool window as a floating page at the caret. The wheel turns pages; the position is remembered per project.**
 
-[![Platform](https://img.shields.io/badge/platform-IntelliJ%20IDEA%202025.2%2B-lightgrey.svg)](#requirements)
+[![Platform](https://img.shields.io/badge/platform-IntelliJ%20IDEA%202024.1%2B-lightgrey.svg)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF.svg)](https://kotlinlang.org/)
 [![Gradle](https://img.shields.io/badge/build-Gradle%20IntelliJ%20Platform%202.10-02303A.svg)](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
 [![License](https://img.shields.io/badge/license-not%20set-lightgrey.svg)](#license)
@@ -28,8 +28,8 @@ Notes, cheat sheets and logs you consult while coding live outside the editor, s
 
 ## Requirements
 
-- **IntelliJ IDEA 2025.2 or later** — `sinceBuild = 252.25557`, developed against `2025.2.4`
-- **JDK 21** — both source and target bytecode
+- **IntelliJ IDEA 2024.1 or later** — `sinceBuild = 241`, developed against `2024.1.7`
+- **JDK 17** — both source and target bytecode
 - **Gradle 9** — use the bundled wrapper (`gradle-9.0.0`), no local install needed
 
 ## Quick Start
@@ -127,7 +127,7 @@ Each editor gets its own counter, but `FileStateService` is project-level, so th
 
 Kotlin style comes from the `intellij_idea` code style configured in `.editorconfig` and enforced by ktlint.
 
-**Tech stack**: Kotlin 2.1 · IntelliJ Platform Gradle Plugin 2.10 · IntelliJ IDEA 2025.2 API · Swing/JB components · ktlint
+**Tech stack**: Kotlin 2.1 · IntelliJ Platform Gradle Plugin 2.10 · IntelliJ IDEA 2024.1 API · Swing/JB components · ktlint
 
 ## License
 

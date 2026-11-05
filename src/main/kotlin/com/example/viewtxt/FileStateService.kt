@@ -1,72 +1,69 @@
 package com.example.viewtxt
 
-import com.intellij.openapi.components.*
-import com.intellij.openapi.project.Project
-import com.intellij.util.xmlb.XmlSerializerUtil
+import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.State
+import com.intellij.openapi.components.Storage
 import java.awt.event.KeyEvent
 
+/**
+ * 项目级设置服务，状态持久化在项目目录下的 viewTxt.xml 中。
+ *
+ * [State] 中各字段即持久化字段，改动字段名会让旧配置失效：
+ * - `lastSelectedFilePath`：上次选中/保存的文件路径
+ * - `lastContentPosition`：弹窗里当前内容的起始索引，用于下次从上次位置继续
+ * - `popupShortcut`：触发弹窗的按键码（见 [KeyEvent]）
+ * - `popupWidth` / `popupHeight`：弹窗宽高
+ */
 @State(
     name = "FileStateService",
-    storages = [Storage("viewTxt.xml")]
+    storages = [Storage("viewTxt.xml")],
 )
 @Service(Service.Level.PROJECT)
 class FileStateService : PersistentStateComponent<FileStateService.State> {
-    
     data class State(
         var lastSelectedFilePath: String = "",
-        var lastContentPosition: Int = 0,  // 记录最后读取内容的位置
-        var popupShortcut: Int = KeyEvent.VK_SLASH,  // 默认快捷键是 '/' 键
-        var popupWidth: Int = 400,  // 默认弹窗宽度
-        var popupHeight: Int = 300  // 默认弹窗高度
+        var lastContentPosition: Int = 0,
+        var popupShortcut: Int = KeyEvent.VK_SLASH,
+        var popupWidth: Int = 400,
+        var popupHeight: Int = 300,
     )
-    
+
     private var myState = State()
-    
-    override fun getState(): State? {
-        return myState
-    }
-    
+
+    override fun getState(): State? = myState
+
     override fun loadState(state: State) {
         myState = state
     }
-    
-    fun setFilePath(path: String) {
-        myState.lastSelectedFilePath = path
-    }
-    
-    fun getFilePath(): String {
-        return myState.lastSelectedFilePath
-    }
-    
-    fun setContentPosition(position: Int) {
-        myState.lastContentPosition = position
-    }
-    
-    fun getContentPosition(): Int {
-        return myState.lastContentPosition
-    }
-    
-    fun setPopupShortcut(keyCode: Int) {
-        myState.popupShortcut = keyCode
-    }
-    
-    fun getPopupShortcut(): Int {
-        return myState.popupShortcut
-    }
-    
-    fun setPopupWidth(width: Int) {
-        myState.popupWidth = width
-    }
-    
-    fun getPopupWidth(): Int {
-        return myState.popupWidth
-    }
-    
-    fun setPopupHeight(height: Int) {
-        myState.popupHeight = height
-    }
-    
-    fun getPopupHeight(): Int {
-        return myState.popupHeight
-    }
+
+    var lastSelectedFilePath: String
+        get() = myState.lastSelectedFilePath
+        set(value) {
+            myState.lastSelectedFilePath = value
+        }
+
+    var lastContentPosition: Int
+        get() = myState.lastContentPosition
+        set(value) {
+            myState.lastContentPosition = value
+        }
+
+    var popupShortcut: Int
+        get() = myState.popupShortcut
+        set(value) {
+            myState.popupShortcut = value
+        }
+
+    var popupWidth: Int
+        get() = myState.popupWidth
+        set(value) {
+            myState.popupWidth = value
+        }
+
+    var popupHeight: Int
+        get() = myState.popupHeight
+        set(value) {
+            myState.popupHeight = value
+        }
 }

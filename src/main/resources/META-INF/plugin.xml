@@ -1,36 +1,30 @@
-<!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <!-- Unique identifier of the plugin. It should be FQN, cannot be changed between the plugin versions. -->
+    <!-- 插件唯一标识，必须是 FQN，发布后不能再改 -->
     <id>com.example.view-txt</id>
 
-    <!-- Public plugin name should be written in Title Case.
-         Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
     <name>View Txt</name>
 
-    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
     <vendor url="">makabaka</vendor>
 
-    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
-         Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
         <p>ide内快捷查看文本文件</p>
     ]]></description>
 
-    <!-- Product and plugin compatibility requirements.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
 
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
-    <!-- Extensions defined by the plugin.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <!-- 资源包路径，与 ViewTxtBundle.kt 中的 BUNDLE 常量保持一致 -->
+    <resource-bundle>messages.ViewTxtBundle</resource-bundle>
+
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="MyToolWindow" factoryClass="com.example.viewtxt.MyToolWindowFactory"
+        <!-- 工具窗口 id 被 ViewTxtBundle.properties 的 toolwindow.stripe.MyToolWindow 引用，不可随意改 -->
+        <toolWindow id="MyToolWindow" factoryClass="com.example.viewtxt.ViewTxtToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>
         <projectService serviceImplementation="com.example.viewtxt.FileStateService"/>
         <action id="com.example.viewtxt.MultiKeyPressAction" class="com.example.viewtxt.MultiKeyPressAction"
                 text="Show File Content Popup" description="Show the content of the selected file in a popup">
             <add-to-group group-id="ToolsMenu" anchor="first"/>
         </action>
-        <editorFactoryListener topic="com.intellij.openapi.editor.event.EditorFactoryListener" implementation="com.example.viewtxt.KeyTypedListener"/>
+        <editorFactoryListener topic="com.intellij.openapi.editor.event.EditorFactoryListener"
+                               implementation="com.example.viewtxt.KeyTypedListener"/>
     </extensions>
 </idea-plugin>

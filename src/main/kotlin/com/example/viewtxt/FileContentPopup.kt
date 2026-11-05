@@ -1,62 +1,79 @@
 package com.example.viewtxt
 
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.colors.FontPreferences
+import com.intellij.openapi.editor.event.VisibleAreaEvent
+import com.intellij.openapi.editor.event.VisibleAreaListener
 import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.ui.popup.JBPopup
+import com.intellij.openapi.ui.popup.JBPopupAdapter
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.ui.popup.LightweightWindowEvent
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.openapi.editor.colors.EditorColorsManager
-import com.intellij.openapi.editor.colors.FontPreferences
 import java.awt.Dimension
-import java.awt.Point
 import java.awt.Font
+import java.awt.Point
+import java.awt.Rectangle
+import java.awt.Toolkit
+import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
 import javax.swing.JList
 
+/**
+ * 文件内容预览弹窗。
+ *
+ * - 定位：弹窗跟在光标右下角，超出屏幕时翻到另一侧并夹在屏幕内，编辑器滚动时同步跟随；
+ * - 翻页：滚轮向下为下一页、向上为上一页，页内按随机长度切行；
+ * - 持久化：当前内容起始索引写回 [FileStateService]，下次打开从上一次的位置继续阅读。
+ */
 class FileContentPopup {
     companion object {
+        /** 弹窗相对光标的水平偏移，避免压住光标所在的字符 */
+        private const val POPUP_OFFSET_X = 70
+
+        /** 弹窗相对光标的垂直偏移，也是上下翻转时的留白 */
+        private const val POPUP_OFFSET_Y = 20
+
         fun show(editor: Editor, content: String, fileName: String) {
-            // 创建一个包含原始内容的变量，用于翻页功能
+            // 翻页始终基于完整原文，所以先把原文留住
             val originalFullContent = content
 
-            // 从FileStateService获取上次的位置和宽高设置
             var currentStartPosition = 0
             var popupWidth = 400
             var popupHeight = 300
             val project = editor.project
             if (project != null) {
                 val service = project.getService(FileStateService::class.java)
-                currentStartPosition = service.getContentPosition()
-                popupWidth = service.getPopupWidth()
-                popupHeight = service.getPopupHeight()
-                // 确保位置在有效范围内
-                if (currentStartPosition < 0) currentStartPosition = 0
+                currentStartPosition = service.lastContentPosition
+                popupWidth = service.popupWidth
+                popupHeight = service.popupHeight
+                if (currentStartPosition < 0) {
+                    currentStartPosition = 0
+                }
                 if (currentStartPosition > originalFullContent.length) {
                     currentStartPosition = originalFullContent.length
                 }
             }
 
-            // 创建列表模型和列表
             val listModel = DefaultListModel<String>()
             val list = JBList(listModel)
 
-            // 定义翻页函数
             fun updateContent(startPos: Int, charCounts: List<Int>) {
-                // 确保起始位置在有效范围内
                 var currentIndex = startPos
-                if (currentIndex < 0) currentIndex = 0
+                if (currentIndex < 0) {
+                    currentIndex = 0
+                }
                 if (currentIndex > originalFullContent.length) {
                     currentIndex = originalFullContent.length
                 }
 
-                // 更新当前起始位置
                 val extractedLines = mutableListOf<String>()
-
-                // 重新加载数据
                 for (charCount in charCounts) {
                     val remainingLength = originalFullContent.length - currentIndex
                     val actualCharCount = minOf(charCount, remainingLength)
@@ -65,7 +82,6 @@ class FileContentPopup {
                     currentIndex += actualCharCount
                 }
 
-                // 如果提取的行数不足10行，补充空行
                 while (extractedLines.size < 10 && currentIndex < originalFullContent.length) {
                     val charCount = charCounts[extractedLines.size]
                     val remainingLength = originalFullContent.length - currentIndex
@@ -75,45 +91,40 @@ class FileContentPopup {
                     currentIndex += actualCharCount
                 }
 
-                // 处理最后的行，如果还有内容则添加省略号
+                // 后面还有内容时补一个 "..." 占位行，提示可以继续翻页
                 val processedLines = if (currentIndex < originalFullContent.length) {
                     extractedLines + "..."
                 } else {
                     extractedLines
                 }
 
-                // 更新列表模型显示新数据
                 listModel.clear()
                 processedLines.forEach { line ->
                     listModel.addElement(line)
                 }
             }
 
-            // 初始化内容
             updateContent(currentStartPosition, (1..10).map { (10..24).random() })
 
-            // 获取IDEA编辑器的字体设置
+            // 弹窗字体跟随 IDE 编辑器的字体设置
             val editorColorsManager = EditorColorsManager.getInstance()
             val fontPreferences = editorColorsManager.globalScheme.fontPreferences
             val fontSize = fontPreferences.getSize(FontPreferences.DEFAULT_FONT_NAME)
             val fontFamily = fontPreferences.fontFamily
             val customFont = Font(fontFamily, Font.PLAIN, fontSize)
 
-            // 自定义渲染器以显示图标
             list.cellRenderer = object : ColoredListCellRenderer<String>() {
                 override fun customizeCellRenderer(
                     list: JList<out String>,
                     value: String?,
                     index: Int,
                     selected: Boolean,
-                    hasFocus: Boolean
+                    hasFocus: Boolean,
                 ) {
-                    // 检查是否是最后一行且内容为"..."
                     if (index == list.model.size - 1 && value == "...") {
-                        // 最后一行不显示图标，设置为灰色
+                        // "..." 占位行不挂文件图标，只做灰色提示
                         append("...", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     } else {
-                        // 随机选择文件类型图标
                         val fileTypes = listOf(".txt", ".js", ".jpg", ".gitignore", ".json")
                         val randomExt = fileTypes.random()
                         val fileType = FileTypeManager.getInstance().getFileTypeByExtension(randomExt.substring(1))
@@ -121,12 +132,10 @@ class FileContentPopup {
                         append(value ?: "")
                     }
 
-                    // 应用IDEA编辑器的字体设置
                     font = customFont
                 }
             }
 
-            // 设置列表首选大小
             list.preferredSize = Dimension(popupWidth, popupHeight)
 
             val scrollPane = JBScrollPane(list)
@@ -135,25 +144,25 @@ class FileContentPopup {
             scrollPane.horizontalScrollBarPolicy = JBScrollPane.HORIZONTAL_SCROLLBAR_NEVER
 
             val panel = JBPanel<JBPanel<*>>().apply {
-                layout = javax.swing.BoxLayout(this, javax.swing.BoxLayout.Y_AXIS)
+                layout = BoxLayout(this, BoxLayout.Y_AXIS)
                 add(scrollPane)
             }
 
-            // 添加鼠标滚轮监听器实现翻页
+            // 每页的切行长度随机生成，用来模拟长文本逐页阅读的效果；
+            // 步长必须记下来，翻回上一页时复用同一批步长才能回到原来的切分点
             var lastCharCounts = (1..10).map { (10..24).random() }
             var lastPageSize = lastCharCounts.sum()
             currentStartPosition = currentStartPosition + lastPageSize
             list.addMouseWheelListener { e ->
-                // 区分下翻（前进）和上翻（回退），复用/生成步长
                 val (newPageSize, newCharCounts) = if (e.wheelRotation > 0) {
-                    // 向下滚动：向后翻页 → 重新生成随机步长，并保存为“上一次步长”
+                    // 滚轮向下：下一页 → 重新生成随机步长，并记为“上一次步长”
                     val charCounts = (1..10).map { (10..24).random() }
                     val pageSize = charCounts.sum()
                     lastPageSize = pageSize
                     lastCharCounts = charCounts
                     Pair(pageSize, charCounts)
                 } else {
-                    // 向上滚动：向前翻页 → 复用上一次下翻的步长，不重新生成
+                    // 滚轮向上：上一页 → 复用上一次的步长，不重新生成
                     Pair(lastPageSize, lastCharCounts)
                 }
 
@@ -173,11 +182,9 @@ class FileContentPopup {
                     currentStartPosition = originalFullContent.length
                 }
 
-                // 更新存储的索引位置
                 if (project != null) {
                     val service = project.getService(FileStateService::class.java)
-                    // 存储当前的起始位置
-                    service.setContentPosition(currentStartPosition)
+                    service.lastContentPosition = currentStartPosition
                 }
 
                 e.consume()
@@ -185,39 +192,30 @@ class FileContentPopup {
 
             val popup = JBPopupFactory.getInstance()
                 .createComponentPopupBuilder(panel, list)
-                .setRequestFocus(false)  // 不获取焦点，光标留在主文件
-                .setCancelKeyEnabled(true)  // ESC关闭
-                .setCancelOnClickOutside(true)  // 点击外部关闭
+                .setRequestFocus(false) // 不抢焦点，光标留在编辑器里
+                .setCancelKeyEnabled(true) // ESC 关闭
+                .setCancelOnClickOutside(true) // 点击外部关闭
                 .setResizable(true)
                 .setMovable(true)
-                // 移除键盘监听器相关的关闭事件处理
                 .createPopup()
 
-            //  更新弹窗位置
             fun updatePopupPosition() {
-                // 检查弹窗是否在编辑器边界内
-                fun isPopupWithinEditorBounds(editor: Editor, popup: com.intellij.openapi.ui.popup.JBPopup): Boolean {
+                fun isPopupWithinEditorBounds(editor: Editor, popup: JBPopup): Boolean {
                     val editorComponent = editor.component
                     val editorBounds = editorComponent.visibleRect
 
-                    // 获取弹窗的位置
                     val popupLocation = popup.locationOnScreen
                     val popupSize = popup.size
+                    val popupRect = Rectangle(popupLocation.x, popupLocation.y, popupSize.width, popupSize.height)
 
-                    // 计算弹窗的边界矩形
-                    val popupRect =
-                        java.awt.Rectangle(popupLocation.x, popupLocation.y, popupSize.width, popupSize.height)
-
-                    // 将编辑器的边界转换为屏幕坐标
                     val editorLocationOnScreen = editorComponent.locationOnScreen
-                    val editorScreenBounds = java.awt.Rectangle(
+                    val editorScreenBounds = Rectangle(
                         editorLocationOnScreen.x,
                         editorLocationOnScreen.y,
                         editorBounds.width,
-                        editorBounds.height
+                        editorBounds.height,
                     )
 
-                    // 检查弹窗是否与编辑器的屏幕边界有交集
                     return popupRect.intersects(editorScreenBounds)
                 }
 
@@ -227,84 +225,74 @@ class FileContentPopup {
                     val editorComponent = editor.component
                     val xy = editor.visualPositionToXY(visualPos)
                     val scrollModel = editor.scrollingModel
-                    
-                    // 获取屏幕尺寸信息
-                    val screenSize = java.awt.Toolkit.getDefaultToolkit().screenSize
+
+                    val screenSize = Toolkit.getDefaultToolkit().screenSize
                     val screenBounds = editorComponent.graphicsConfiguration.bounds
                     val actualScreenWidth = screenBounds.width
-                    val actualScreenY = screenBounds.y
-                    
-                    // 先创建弹窗以获取其尺寸
+
+                    // 先显示一次才能拿到弹窗的真实尺寸
                     if (!popup.isVisible) {
                         popup.show(RelativePoint.getNorthWestOf(editorComponent))
                     }
-                    
-                    // 获取弹窗的实际尺寸
+
                     val popupWidth = popup.size.width
                     val popupHeight = popup.size.height
-                    
-                    // 计算相对于编辑器组件的光标位置
+
                     val cursorX = xy.x - scrollModel.horizontalScrollOffset
                     val cursorY = xy.y - scrollModel.verticalScrollOffset
-                    
-                    // 计算弹窗应该出现的位置（在光标右下角）
-                    var popupX = cursorX + 70  // 在光标右侧20像素
-                    var popupY = cursorY + 20  // 在光标下方20像素
-                    
-                    // 检查是否超出屏幕右边界
+
+                    // 默认放在光标右下角
+                    var popupX = cursorX + POPUP_OFFSET_X
+                    var popupY = cursorY + POPUP_OFFSET_Y
+
+                    // 右侧或底部放不下时翻到光标另一侧，再夹进屏幕范围
                     if (popupX + popupWidth > actualScreenWidth) {
-                        popupX = maxOf(0, cursorX - popupWidth)  // 放到光标左侧
+                        popupX = maxOf(0, cursorX - popupWidth)
                     }
-                    
-                    // 检查是否超出屏幕底部
                     if (popupY + popupHeight > screenSize.height) {
-                        popupY = maxOf(0, cursorY - popupHeight - 20)  // 放到光标上方
+                        popupY = maxOf(0, cursorY - popupHeight - POPUP_OFFSET_Y)
                     }
-                    
-                    // 确保弹窗不会超出屏幕左边界
-                    if (popupX < 0) popupX = 0
-                    // 确保弹窗不会超出屏幕上边界
-                    if (popupY < 0) popupY = 0
-                    
+                    if (popupX < 0) {
+                        popupX = 0
+                    }
+                    if (popupY < 0) {
+                        popupY = 0
+                    }
+
                     val adjustedPoint = RelativePoint(
                         editorComponent,
-                        Point(popupX, popupY)
+                        Point(popupX, popupY),
                     )
-                    
+
                     if (!popup.isVisible) {
                         popup.show(adjustedPoint)
+                    } else if (isPopupWithinEditorBounds(editor, popup)) {
+                        popup.setLocation(adjustedPoint.screenPoint)
                     } else {
-                        if (isPopupWithinEditorBounds(editor, popup)) {
-                            popup.setLocation(adjustedPoint.screenPoint)
-                        } else {
-                            if (popup.isVisible)
-                                popup.cancel()
-                        }
+                        popup.cancel()
                     }
                 }.onFailure {
+                    // 定位失败时保持弹窗在原位，不打断用户
                 }
             }
-            // 监听主编辑器的滚动事件
-            val scrollingListener = object : com.intellij.openapi.editor.event.VisibleAreaListener {
-                override fun visibleAreaChanged(e: com.intellij.openapi.editor.event.VisibleAreaEvent) {
-                    if (popup.isDisposed.not()) {
-                        // 重新计算并更新弹窗位置
+
+            val scrollingListener = object : VisibleAreaListener {
+                override fun visibleAreaChanged(e: VisibleAreaEvent) {
+                    if (!popup.isDisposed) {
                         updatePopupPosition()
                     }
                 }
             }
 
-            // 弹窗关闭时移除监听器
-            popup.addListener(object : com.intellij.openapi.ui.popup.JBPopupAdapter() {
-                override fun onClosed(event: com.intellij.openapi.ui.popup.LightweightWindowEvent) {
+            // 弹窗关闭后编辑器仍在，必须自己摘掉监听器，否则它会一直引用已销毁的弹窗
+            popup.addListener(object : JBPopupAdapter() {
+                override fun onClosed(event: LightweightWindowEvent) {
                     editor.scrollingModel.removeVisibleAreaListener(scrollingListener)
                 }
             })
 
-            // 设置弹窗位置
             updatePopupPosition()
 
-            // 注册滚动监听器
             editor.scrollingModel.addVisibleAreaListener(scrollingListener)
         }
     }

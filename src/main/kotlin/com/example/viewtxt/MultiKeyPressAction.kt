@@ -1,92 +1,89 @@
 package com.example.viewtxt
 
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
 
+/**
+ * Tools 菜单入口：按工具窗口里保存的路径读取文件内容并弹出预览。
+ *
+ * 连击触发是在 [KeyTypedListener] 中检测的，这里的 Action 只提供菜单项与可用状态，
+ * 因此菜单点击和连击走的是同一套路径读取与校验逻辑。
+ */
 class MultiKeyPressAction : AnAction() {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val editor = getActiveEditor(e) ?: return
-
-        // 这个动作现在只是作为一个入口点，实际的按键检测在KeyTypedListener中处理
-        // 此处保留作为菜单项的入口
-        val service = project.getService(FileStateService::class.java)
-        val selectedFilePath = service.getFilePath()
+        val selectedFilePath = project.getService(FileStateService::class.java).lastSelectedFilePath
 
         if (selectedFilePath.isEmpty()) {
-            com.intellij.openapi.ui.Messages.showMessageDialog(
+            Messages.showMessageDialog(
                 project,
                 "没有选择任何文件，请先在工具窗口中选择一个文件。",
                 "无文件可打开",
-                com.intellij.openapi.ui.Messages.getWarningIcon()
+                Messages.getWarningIcon(),
             )
             return
         }
 
-        val file = java.io.File(selectedFilePath)
+        val file = File(selectedFilePath)
         if (!file.exists()) {
-            com.intellij.openapi.ui.Messages.showMessageDialog(
+            Messages.showMessageDialog(
                 project,
                 "文件不存在: $selectedFilePath",
                 "文件错误",
-                com.intellij.openapi.ui.Messages.getErrorIcon()
+                Messages.getErrorIcon(),
             )
             return
         }
 
         if (file.isDirectory) {
-            com.intellij.openapi.ui.Messages.showMessageDialog(
+            Messages.showMessageDialog(
                 project,
                 "不能打开目录: $selectedFilePath",
                 "无效路径",
-                com.intellij.openapi.ui.Messages.getWarningIcon()
+                Messages.getWarningIcon(),
             )
             return
         }
 
         try {
-            val content = String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(selectedFilePath)))
-            val fileName = file.name
-            
-            // 显示弹窗
-            FileContentPopup.show(editor, content, fileName)
-            
+            val content = String(Files.readAllBytes(Paths.get(selectedFilePath)))
+            FileContentPopup.show(editor, content, file.name)
         } catch (ex: Exception) {
-            com.intellij.openapi.ui.Messages.showMessageDialog(
+            Messages.showMessageDialog(
                 project,
                 "读取文件时出错: \${ex.message}",
                 "读取错误",
-                com.intellij.openapi.ui.Messages.getErrorIcon()
+                Messages.getErrorIcon(),
             )
         }
     }
 
-
     override fun update(e: AnActionEvent) {
-        // 更新动作状态
         val editor = getActiveEditor(e)
         e.presentation.isEnabledAndVisible = editor != null
     }
 
+    /**
+     * 优先取动作事件里的编辑器，取不到（例如从菜单触发的场景）再退回当前选中的文本编辑器。
+     */
     private fun getActiveEditor(e: AnActionEvent): Editor? {
         val project = e.project ?: return null
 
-        // 首先尝试从动作事件中获取编辑器
-        var editor = e.getData(CommonDataKeys.EDITOR)
+        val editor = e.getData(CommonDataKeys.EDITOR)
         if (editor != null) {
             return editor
         }
 
-        // 如果从事件中获取不到，则尝试从文件管理器中获取
         val fileEditorManager = FileEditorManager.getInstance(project)
-        val selectedEditor = fileEditorManager.selectedTextEditor
-        return selectedEditor
+        return fileEditorManager.selectedTextEditor
     }
 }

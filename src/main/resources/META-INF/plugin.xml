@@ -2,7 +2,7 @@
     <!-- 插件唯一标识，必须是 FQN，发布后不能再改 -->
     <id>com.example.view-txt</id>
 
-    <name>View Txt</name>
+    <name>IVT</name>
 
     <vendor url="">makabaka</vendor>
 

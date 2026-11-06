@@ -20,7 +20,7 @@ import javax.swing.JButton
 import javax.swing.JComboBox
 
 /**
- * “View Txt” 工具窗口工厂，工具窗口 id 见 plugin.xml 中的 `MyToolWindow`。
+ * “IVT” 工具窗口工厂，工具窗口 id 见 plugin.xml 中的 `MyToolWindow`。
  */
 class ViewTxtToolWindowFactory : ToolWindowFactory {
     override fun shouldBeAvailable(project: Project) = true

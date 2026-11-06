@@ -1,1 +1,1 @@
-rootProject.name = "View Txt"
+rootProject.name = "IVT"

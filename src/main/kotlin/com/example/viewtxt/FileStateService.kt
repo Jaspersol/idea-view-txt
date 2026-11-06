@@ -1,13 +1,15 @@
 package com.example.viewtxt
 
 import com.intellij.openapi.components.PersistentStateComponent
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import java.awt.event.KeyEvent
 
 /**
  * 项目级设置服务，状态持久化在项目目录下的 viewTxt.xml 中。
+ *
+ * 服务在 plugin.xml 中通过 `<projectService serviceImplementation=.../>` 注册（唯一的注册方式，
+ * 不要再用 `@Service` 注解重复注册），代码里统一通过 `project.getService(FileStateService::class.java)` 获取。
  *
  * [State] 中各字段即持久化字段，改动字段名会让旧配置失效：
  * - `lastSelectedFilePath`：上次选中/保存的文件路径
@@ -19,7 +21,6 @@ import java.awt.event.KeyEvent
     name = "FileStateService",
     storages = [Storage("viewTxt.xml")],
 )
-@Service(Service.Level.PROJECT)
 class FileStateService : PersistentStateComponent<FileStateService.State> {
     data class State(
         var lastSelectedFilePath: String = "",

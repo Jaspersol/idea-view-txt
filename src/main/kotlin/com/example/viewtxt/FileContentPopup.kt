@@ -44,50 +44,51 @@ class FileContentPopup {
             // 翻页始终基于完整原文，所以先把原文留住
             val originalFullContent = content
 
-            var currentStartPosition = 0
+            var initialStartPosition = 0
             var popupWidth = 400
             var popupHeight = 300
             val project = editor.project
             if (project != null) {
                 val service = project.getService(FileStateService::class.java)
-                currentStartPosition = service.lastContentPosition
+                initialStartPosition = service.lastContentPosition
                 popupWidth = service.popupWidth
                 popupHeight = service.popupHeight
-                if (currentStartPosition < 0) {
-                    currentStartPosition = 0
-                }
-                if (currentStartPosition > originalFullContent.length) {
-                    currentStartPosition = originalFullContent.length
-                }
+            }
+            // 索引越界（例如上次正好停在文末）时从头开始，否则会渲染出一页空行
+            if (initialStartPosition !in 0 until originalFullContent.length) {
+                initialStartPosition = 0
             }
 
             val listModel = DefaultListModel<String>()
             val list = JBList(listModel)
 
-            fun updateContent(startPos: Int, charCounts: List<Int>) {
-                var currentIndex = startPos
-                if (currentIndex < 0) {
-                    currentIndex = 0
-                }
-                if (currentIndex > originalFullContent.length) {
-                    currentIndex = originalFullContent.length
-                }
+            /*
+             * 每页的切行长度随机生成（10 行、每行 10~24 个字符），但一页一旦生成就固定下来：
+             * 起点记在 pageStarts，切分记在 pageLayouts。前进用“上一页起点 + 上一页步长”，
+             * 回翻直接复用上一页记录的起点和切分，渲染与推进始终用同一组数据。
+             */
+            fun randomLayout(): List<Int> = (1..10).map { (10..24).random() }
 
+            val pageStarts = mutableListOf(initialStartPosition)
+            val pageLayouts = mutableListOf(randomLayout())
+            var pageIndex = 0
+
+            // 这一页之后的下一个起点；已经到文末时就是文件长度
+            fun nextPageStart(): Int {
+                val nextStart = pageStarts[pageIndex] + pageLayouts[pageIndex].sum()
+                return minOf(nextStart, originalFullContent.length)
+            }
+
+            // 渲染一页；到文末时提前结束，不再补空行
+            fun renderPage(startPos: Int, charCounts: List<Int>) {
+                var currentIndex = startPos
                 val extractedLines = mutableListOf<String>()
                 for (charCount in charCounts) {
-                    val remainingLength = originalFullContent.length - currentIndex
-                    val actualCharCount = minOf(charCount, remainingLength)
-                    val line = originalFullContent.substring(currentIndex, currentIndex + actualCharCount)
-                    extractedLines.add(line)
-                    currentIndex += actualCharCount
-                }
-
-                while (extractedLines.size < 10 && currentIndex < originalFullContent.length) {
-                    val charCount = charCounts[extractedLines.size]
-                    val remainingLength = originalFullContent.length - currentIndex
-                    val actualCharCount = minOf(charCount, remainingLength)
-                    val line = originalFullContent.substring(currentIndex, currentIndex + actualCharCount)
-                    extractedLines.add(line)
+                    if (currentIndex >= originalFullContent.length) {
+                        break
+                    }
+                    val actualCharCount = minOf(charCount, originalFullContent.length - currentIndex)
+                    extractedLines.add(originalFullContent.substring(currentIndex, currentIndex + actualCharCount))
                     currentIndex += actualCharCount
                 }
 
@@ -104,7 +105,7 @@ class FileContentPopup {
                 }
             }
 
-            updateContent(currentStartPosition, (1..10).map { (10..24).random() })
+            renderPage(pageStarts[pageIndex], pageLayouts[pageIndex])
 
             // 弹窗字体跟随 IDE 编辑器的字体设置
             val editorColorsManager = EditorColorsManager.getInstance()
@@ -148,43 +149,33 @@ class FileContentPopup {
                 add(scrollPane)
             }
 
-            // 每页的切行长度随机生成，用来模拟长文本逐页阅读的效果；
-            // 步长必须记下来，翻回上一页时复用同一批步长才能回到原来的切分点
-            var lastCharCounts = (1..10).map { (10..24).random() }
-            var lastPageSize = lastCharCounts.sum()
-            currentStartPosition = currentStartPosition + lastPageSize
             list.addMouseWheelListener { e ->
-                val (newPageSize, newCharCounts) = if (e.wheelRotation > 0) {
-                    // 滚轮向下：下一页 → 重新生成随机步长，并记为“上一次步长”
-                    val charCounts = (1..10).map { (10..24).random() }
-                    val pageSize = charCounts.sum()
-                    lastPageSize = pageSize
-                    lastCharCounts = charCounts
-                    Pair(pageSize, charCounts)
-                } else {
-                    // 滚轮向上：上一页 → 复用上一次的步长，不重新生成
-                    Pair(lastPageSize, lastCharCounts)
-                }
-
                 if (e.wheelRotation > 0) {
-                    updateContent(currentStartPosition, newCharCounts)
-                    currentStartPosition = currentStartPosition + newPageSize
-                } else {
-                    updateContent(currentStartPosition - 2 * newPageSize, newCharCounts)
-                    currentStartPosition = currentStartPosition - newPageSize
-                }
-
-                // 避免越界
-                if (currentStartPosition < 0) {
-                    currentStartPosition = 0
-                }
-                if (currentStartPosition > originalFullContent.length) {
-                    currentStartPosition = originalFullContent.length
+                    // 滚轮向下：下一页。新页起点 = 上一页起点 + 上一页步长，与首屏渲染用同一套算法
+                    val nextStart = nextPageStart()
+                    if (nextStart < originalFullContent.length) {
+                        // 第一次走到这里才生成新页；回翻后再前进复用已记录的页，切分不变
+                        if (pageIndex == pageStarts.lastIndex) {
+                            pageStarts.add(nextStart)
+                            pageLayouts.add(randomLayout())
+                        }
+                        pageIndex++
+                        renderPage(pageStarts[pageIndex], pageLayouts[pageIndex])
+                    }
+                    // 已经到文末时滚轮向下不做任何事，避免出现一页空行
+                } else if (e.wheelRotation < 0) {
+                    // 滚轮向上：回到上一页真实记录的起点（而不是当前起点减两页步长）
+                    if (pageIndex > 0) {
+                        pageIndex--
+                        renderPage(pageStarts[pageIndex], pageLayouts[pageIndex])
+                    }
                 }
 
                 if (project != null) {
-                    val service = project.getService(FileStateService::class.java)
-                    service.lastContentPosition = currentStartPosition
+                    // 保存下次展示的起点：通常是下一页开头；已经到文末时停在当前页开头
+                    val nextStart = nextPageStart()
+                    val savedPosition = if (nextStart < originalFullContent.length) nextStart else pageStarts[pageIndex]
+                    project.getService(FileStateService::class.java).lastContentPosition = savedPosition
                 }
 
                 e.consume()

@@ -7,8 +7,6 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ui.Messages
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.Paths
 
 /**
  * Tools 菜单入口：按工具窗口里保存的路径读取文件内容并弹出预览。
@@ -54,10 +52,8 @@ class MultiKeyPressAction : AnAction() {
             return
         }
 
-        try {
-            val content = String(Files.readAllBytes(Paths.get(selectedFilePath)))
-            FileContentPopup.show(editor, content, file.name)
-        } catch (ex: Exception) {
+        // 读取与解码都在后台线程，大文件不会卡住 EDT；弹窗创建回到 EDT 执行
+        fun showReadError(ex: Throwable) {
             Messages.showMessageDialog(
                 project,
                 "读取文件时出错: ${ex.message}",
@@ -65,6 +61,18 @@ class MultiKeyPressAction : AnAction() {
                 Messages.getErrorIcon(),
             )
         }
+
+        FileContentLoader.readTextAsync(
+            file,
+            onSuccess = { content ->
+                try {
+                    FileContentPopup.show(editor, content, file.name)
+                } catch (ex: Exception) {
+                    showReadError(ex)
+                }
+            },
+            onError = { ex -> showReadError(ex) },
+        )
     }
 
     override fun update(e: AnActionEvent) {

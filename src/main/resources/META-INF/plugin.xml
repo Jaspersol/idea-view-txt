@@ -23,11 +23,13 @@
         <toolWindow id="MyToolWindow" factoryClass="com.example.viewtxt.ViewTxtToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>
         <projectService serviceImplementation="com.example.viewtxt.FileStateService"/>
+        <editorFactoryListener implementation="com.example.viewtxt.KeyTypedListener"/>
+    </extensions>
+
+    <actions>
         <action id="com.example.viewtxt.MultiKeyPressAction" class="com.example.viewtxt.MultiKeyPressAction"
                 text="Show File Content Popup" description="Show the content of the selected file in a popup">
             <add-to-group group-id="ToolsMenu" anchor="first"/>
         </action>
-        <editorFactoryListener topic="com.intellij.openapi.editor.event.EditorFactoryListener"
-                               implementation="com.example.viewtxt.KeyTypedListener"/>
-    </extensions>
+    </actions>
 </idea-plugin>

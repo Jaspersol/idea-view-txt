@@ -12,13 +12,18 @@ import java.io.File
 object FileContentPresenter {
     private const val NOTIFICATION_GROUP_ID = "ViewTxt"
 
+    private data class ActivePopup(val request: Long, val popup: FileContentPopup)
+
     @Volatile
-    private var activePopup: FileContentPopup? = null
+    private var activePopup: ActivePopup? = null
 
     @Volatile
     private var requestSerial: Long = 0
 
-    fun show(project: Project, editor: Editor) {
+    fun show(project: Project, editor: Editor, triggerOffset: Int = editor.caretModel.offset) {
+        if (project.isDisposed || editor.isDisposed || !editor.contentComponent.isShowing) {
+            return
+        }
         val service = project.getService(FileStateService::class.java)
         val selectedFilePath = service.lastSelectedFilePath
         if (selectedFilePath.isEmpty()) {
@@ -33,27 +38,32 @@ object FileContentPresenter {
         }
 
         val request = ++requestSerial
-        val triggerScreenPoint = FileContentPopup.caretScreenPoint(editor)
 
         FileContentLoader.readTextAsync(
             file,
             project = project,
             onSuccess = { content ->
-                if (request != requestSerial || project.isDisposed || editor.isDisposed) {
+                if (
+                    request != requestSerial ||
+                    project.isDisposed ||
+                    editor.isDisposed ||
+                    !editor.contentComponent.isShowing
+                ) {
                     return@readTextAsync
                 }
-                activePopup?.close()
-                activePopup = FileContentPopup.show(
+                activePopup?.popup?.close()
+                val popup = FileContentPopup.show(
                     editor,
                     content,
                     file.name,
-                    triggerScreenPoint,
+                    triggerOffset,
                     onClosed = {
-                        if (request == requestSerial) {
+                        if (activePopup?.request == request) {
                             activePopup = null
                         }
                     },
                 )
+                activePopup = popup?.let { ActivePopup(request, it) }
             },
             onError = { error ->
                 if (request != requestSerial || project.isDisposed) {

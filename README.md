@@ -49,14 +49,14 @@ Or use the bundled run configuration: `.run/Run IDE with Plugin.run.xml` runs `r
 1. **Open the tool window** — the `view-txt setting` stripe on the right edge of the window (View → Tool Windows → view-txt setting, depending on your keymap).
 2. **Pick a file** — 浏览 selects a file; 保存路径 stores it. Saving a new path resets the index to 0, because an index from another file would land in the middle of unrelated text.
 3. **Choose the trigger key** — the dropdown lists `/`, `.`, `,`, `;`, `'`, `` ` ``, `-`, `=`, `[`, `]` and `\`; 设置快捷键 applies it.
-4. **Read it** — focus the editor and press that key **three times within 2 seconds**. The popup appears at the caret; the wheel scrolls down for the next page and up for the previous one. `Esc` or a click outside closes it.
+4. **Read it** — focus the editor and tap that key **three times within 2 seconds**. All three characters are entered normally; the popup appears next to the caret after the third character. The wheel over the popup flips pages; `Esc` or a click outside closes it.
 5. **Optional** — the Tools menu → *Show File Content Popup* does the same as the triple-tap, using the same path and index.
 
 ## Features
 
 ### Popup rendering
 
-- **Caret-following placement** — below-right of the caret with a fixed offset; near the screen edge it flips to the other side and is clamped on screen, and it follows the editor when you scroll
+- **Caret-following placement** — below the caret with its left edge aligned to the caret, flipping near screen edges. It follows caret movement and editor scrolling, and closes if its anchor leaves the editor viewport.
 - **Random page lengths** — each page is ten lines of 10–24 characters, so pages read like prose rather than a fixed grid; the step list is remembered so going back reaches exactly the previous boundary
 - **`...` placeholder** — a greyed line marks that more content follows
 - **Editor font** — the popup uses the IDE's editor scheme font and size, and each line carries a file-type icon
@@ -108,7 +108,7 @@ Yes. The file chooser has no project scope restriction, and the path is stored a
 <details>
 <summary><strong>Where do the counters live, and do they leak memory?</strong></summary>
 
-Press counts and last-press times are kept in `WeakHashMap<Editor, …>` keyed by the editor instance, so they are discarded when an editor is collected — a long-running IDE session doesn't accumulate entries for closed editors.
+Each editor has its own key listener and press count. The listener is removed when the editor is released, so counts do not accumulate for closed editors.
 
 </details>
 

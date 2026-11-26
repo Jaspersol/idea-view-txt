@@ -1,5 +1,6 @@
 package com.example.viewtxt
 
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -13,6 +14,8 @@ import com.intellij.openapi.fileEditor.FileEditorManager
  * 因此菜单点击和连击走的是同一套路径读取与校验逻辑。
  */
 class MultiKeyPressAction : AnAction() {
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return

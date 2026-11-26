@@ -3,43 +3,42 @@ package com.example.viewtxt
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.FontPreferences
-import com.intellij.openapi.editor.event.VisibleAreaEvent
+import com.intellij.openapi.editor.event.CaretEvent
+import com.intellij.openapi.editor.event.CaretListener
 import com.intellij.openapi.editor.event.VisibleAreaListener
+import com.intellij.openapi.editor.ex.util.EditorUtil
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.ui.popup.JBPopup
-import com.intellij.openapi.ui.popup.JBPopupAdapter
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.ui.popup.JBPopupListener
 import com.intellij.openapi.ui.popup.LightweightWindowEvent
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.ColoredListCellRenderer
+import com.intellij.ui.ScreenUtil
 import com.intellij.ui.SimpleTextAttributes
-import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.util.ui.UIUtil
 import java.awt.Dimension
 import java.awt.Font
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.MouseWheelEvent
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
 import javax.swing.JList
+import javax.swing.SwingUtilities
 
 /**
  * 文件内容预览弹窗。
  *
- * - 定位：弹窗跟在光标右下角，超出屏幕时翻到另一侧并夹在屏幕内，编辑器滚动时同步跟随；
+ * - 定位：弹窗左边缘与光标横向对齐，默认在光标下方，超出屏幕时翻转，编辑器滚动时同步跟随；
  * - 翻页：滚轮向下为下一页、向上为上一页，页内按随机长度切行；
  * - 持久化：当前内容起始索引写回 [FileStateService]，下次打开从上一次的位置继续阅读。
  */
 class FileContentPopup {
     companion object {
-        /** 弹窗相对光标的水平偏移，避免压住光标所在的字符 */
-        private const val POPUP_OFFSET_X = 70
-
         /** 弹窗相对光标的垂直偏移，也是上下翻转时的留白 */
         private const val POPUP_OFFSET_Y = 20
 
@@ -47,9 +46,32 @@ class FileContentPopup {
             editor: Editor,
             content: String,
             fileName: String,
-            triggerScreenPoint: Point? = null,
+            triggerOffset: Int,
             onClosed: () -> Unit = {},
-        ): FileContentPopup {
+        ): FileContentPopup? {
+            val editorComponent = editor.contentComponent
+            var followCurrentCaret = false
+
+            fun anchorScreenPoint(): Point? {
+                if (editor.isDisposed || !editorComponent.isShowing) {
+                    return null
+                }
+                val caret = editor.caretModel.primaryCaret
+                val point = if (followCurrentCaret || caret.offset == triggerOffset) {
+                    editor.visualPositionToXY(caret.visualPosition)
+                } else {
+                    editor.offsetToXY(triggerOffset.coerceAtMost(editor.document.textLength))
+                }
+                val caretBounds = Rectangle(point.x, point.y, 1, editor.lineHeight)
+                if (!editor.scrollingModel.visibleArea.intersects(caretBounds)) {
+                    return null
+                }
+                SwingUtilities.convertPointToScreen(point, editorComponent)
+                return point
+            }
+
+            val initialAnchor = anchorScreenPoint() ?: return null
+
             // 翻页始终基于完整原文，所以先把原文留住
             val originalFullContent = content
 
@@ -202,134 +224,69 @@ class FileContentPopup {
                 .setRequestFocus(false) // 不抢焦点，光标留在编辑器里
                 .setCancelKeyEnabled(true) // ESC 关闭
                 .setCancelOnClickOutside(true) // 点击外部关闭
+                .setLocateByContent(false)
                 .setResizable(true)
                 .setMovable(true)
                 .createPopup()
 
-            fun updatePopupPosition(followCaret: Boolean = false) {
-                fun isPopupWithinEditorBounds(editor: Editor, popup: JBPopup): Boolean {
-                    val editorComponent = editor.component
-                    val editorBounds = editorComponent.visibleRect
-
-                    val popupLocation = popup.locationOnScreen
-                    val popupSize = popup.size
-                    val popupRect = Rectangle(popupLocation.x, popupLocation.y, popupSize.width, popupSize.height)
-
-                    val editorLocationOnScreen = editorComponent.locationOnScreen
-                    val editorScreenBounds = Rectangle(
-                        editorLocationOnScreen.x,
-                        editorLocationOnScreen.y,
-                        editorBounds.width,
-                        editorBounds.height,
-                    )
-
-                    return popupRect.intersects(editorScreenBounds)
+            popup.showInScreenCoordinates(editorComponent, popupLocation(initialAnchor, popup.content.preferredSize))
+            if (!popup.isVisible) {
+                if (!popup.isDisposed) {
+                    Disposer.dispose(popup)
                 }
-
-                runCatching {
-                    if (popup.isDisposed) {
-                        return
-                    }
-
-                    val editorComponent = editor.component
-                    val screenBounds = editorComponent.graphicsConfiguration.bounds
-                    val editorLocation = editorComponent.locationOnScreen
-
-                    val anchorScreenPoint = triggerScreenPoint ?: caretScreenPoint(editor)
-                    val currentCaretScreenPoint = if (popup.isVisible && followCaret) {
-                        caretScreenPoint(editor)
-                    } else {
-                        anchorScreenPoint
-                    }
-
-                    if (!popup.isVisible) {
-                        popup.show(
-                            RelativePoint(
-                                editorComponent,
-                                Point(
-                                    currentCaretScreenPoint.x - editorLocation.x,
-                                    currentCaretScreenPoint.y - editorLocation.y,
-                                ),
-                            ),
-                        )
-                    }
-
-                    val popupWidth = popup.size.width
-                    val popupHeight = popup.size.height
-
-                    var popupX = currentCaretScreenPoint.x + POPUP_OFFSET_X
-                    var popupY = currentCaretScreenPoint.y + POPUP_OFFSET_Y
-
-                    if (popupX + popupWidth > screenBounds.x + screenBounds.width) {
-                        popupX = maxOf(screenBounds.x, currentCaretScreenPoint.x - popupWidth)
-                    }
-                    if (popupY + popupHeight > screenBounds.y + screenBounds.height) {
-                        popupY = maxOf(screenBounds.y, currentCaretScreenPoint.y - popupHeight - POPUP_OFFSET_Y)
-                    }
-                    popupX = popupX.coerceIn(screenBounds.x, screenBounds.x + screenBounds.width - popupWidth)
-                    popupY = popupY.coerceIn(screenBounds.y, screenBounds.y + screenBounds.height - popupHeight)
-
-                    if (!popup.isVisible) {
-                        popup.show(
-                            RelativePoint(
-                                editorComponent,
-                                Point(popupX - editorLocation.x, popupY - editorLocation.y),
-                            ),
-                        )
-                    } else if (isPopupWithinEditorBounds(editor, popup)) {
-                        popup.setLocation(Point(popupX, popupY))
-                    } else {
-                        popup.cancel()
-                    }
-                }.onFailure {
-                    // 定位失败时保持弹窗在原位，不打断用户
-                }
+                return null
             }
 
-            val scrollUpdatePending = AtomicBoolean(false)
-
+            var positionUpdatePending = false
             fun schedulePopupPositionUpdate() {
-                if (!scrollUpdatePending.compareAndSet(false, true)) {
+                if (positionUpdatePending) {
                     return
                 }
+                positionUpdatePending = true
 
-                UIUtil.invokeLaterIfNeeded {
-                    if (scrollUpdatePending.compareAndSet(true, false) && !popup.isDisposed) {
-                        updatePopupPosition(followCaret = true)
+                SwingUtilities.invokeLater {
+                    positionUpdatePending = false
+                    if (!popup.isDisposed && popup.isVisible) {
+                        val anchor = anchorScreenPoint()
+                        if (anchor == null) {
+                            popup.cancel()
+                        } else {
+                            popup.setLocation(popupLocation(anchor, popup.size))
+                        }
                     }
                 }
             }
 
-            val scrollingListener = object : VisibleAreaListener {
-                override fun visibleAreaChanged(e: VisibleAreaEvent) {
-                    if (!popup.isDisposed) {
+            editor.scrollingModel.addVisibleAreaListener(VisibleAreaListener { schedulePopupPositionUpdate() }, popup)
+            editor.caretModel.addCaretListener(
+                object : CaretListener {
+                    override fun caretPositionChanged(event: CaretEvent) {
+                        followCurrentCaret = true
                         schedulePopupPositionUpdate()
                     }
-                }
-            }
-
-            // 弹窗关闭后编辑器仍在，必须自己摘掉监听器，否则它会一直引用已销毁的弹窗
-            popup.addListener(object : JBPopupAdapter() {
+                },
+                popup,
+            )
+            popup.addListener(object : JBPopupListener {
                 override fun onClosed(event: LightweightWindowEvent) {
-                    editor.scrollingModel.removeVisibleAreaListener(scrollingListener)
                     onClosed()
                 }
             })
+            EditorUtil.disposeWithEditor(editor, popup)
 
-            updatePopupPosition()
-
-            editor.scrollingModel.addVisibleAreaListener(scrollingListener)
             return FileContentPopup(popup)
         }
 
-        /**
-         * 光标在屏幕上的位置。读取是异步的，触发点必须在发起读取前捕获，
-         * 否则加载期间光标移动会让弹窗出现在移动后的位置。
-         */
-        fun caretScreenPoint(editor: Editor): Point {
-            val visualPosition = editor.caretModel.visualPosition
-            val editorPoint = editor.visualPositionToXY(visualPosition)
-            return RelativePoint(editor.component, editorPoint).screenPoint
+        private fun popupLocation(anchor: Point, size: Dimension): Point {
+            val screen = ScreenUtil.getScreenRectangle(anchor)
+            val width = minOf(size.width, screen.width)
+            val height = minOf(size.height, screen.height)
+            val maxX = screen.x + screen.width - width
+            val maxY = screen.y + screen.height - height
+            val below = anchor.y + POPUP_OFFSET_Y
+            val x = if (anchor.x <= maxX) anchor.x else anchor.x - width
+            val y = if (below <= maxY) below else anchor.y - height - POPUP_OFFSET_Y
+            return Point(x.coerceIn(screen.x, maxX), y.coerceIn(screen.y, maxY))
         }
 
         private fun fileTypeFor(fileName: String): FileType {

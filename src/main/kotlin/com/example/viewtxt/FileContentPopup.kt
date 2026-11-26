@@ -5,6 +5,7 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.FontPreferences
 import com.intellij.openapi.editor.event.VisibleAreaEvent
 import com.intellij.openapi.editor.event.VisibleAreaListener
+import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupAdapter
@@ -16,11 +17,13 @@ import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.util.ui.UIUtil
 import java.awt.Dimension
 import java.awt.Font
 import java.awt.Point
 import java.awt.Rectangle
-import java.awt.Toolkit
+import java.awt.event.MouseWheelEvent
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
 import javax.swing.JList
@@ -40,7 +43,13 @@ class FileContentPopup {
         /** 弹窗相对光标的垂直偏移，也是上下翻转时的留白 */
         private const val POPUP_OFFSET_Y = 20
 
-        fun show(editor: Editor, content: String, fileName: String) {
+        fun show(
+            editor: Editor,
+            content: String,
+            fileName: String,
+            triggerScreenPoint: Point? = null,
+            onClosed: () -> Unit = {},
+        ): FileContentPopup {
             // 翻页始终基于完整原文，所以先把原文留住
             val originalFullContent = content
 
@@ -113,6 +122,7 @@ class FileContentPopup {
             val fontSize = fontPreferences.getSize(FontPreferences.DEFAULT_FONT_NAME)
             val fontFamily = fontPreferences.fontFamily
             val customFont = Font(fontFamily, Font.PLAIN, fontSize)
+            val fileType = fileTypeFor(fileName)
 
             list.cellRenderer = object : ColoredListCellRenderer<String>() {
                 override fun customizeCellRenderer(
@@ -126,9 +136,6 @@ class FileContentPopup {
                         // "..." 占位行不挂文件图标，只做灰色提示
                         append("...", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     } else {
-                        val fileTypes = listOf(".txt", ".js", ".jpg", ".gitignore", ".json")
-                        val randomExt = fileTypes.random()
-                        val fileType = FileTypeManager.getInstance().getFileTypeByExtension(randomExt.substring(1))
                         icon = fileType.icon
                         append(value ?: "")
                     }
@@ -149,8 +156,14 @@ class FileContentPopup {
                 add(scrollPane)
             }
 
-            list.addMouseWheelListener { e ->
-                if (e.wheelRotation > 0) {
+            fun handleMouseWheel(e: MouseWheelEvent) {
+                val rotation = if (e.preciseWheelRotation != 0.0) {
+                    e.preciseWheelRotation
+                } else {
+                    e.wheelRotation.toDouble()
+                }
+
+                if (rotation > 0) {
                     // 滚轮向下：下一页。新页起点 = 上一页起点 + 上一页步长，与首屏渲染用同一套算法
                     val nextStart = nextPageStart()
                     if (nextStart < originalFullContent.length) {
@@ -163,7 +176,7 @@ class FileContentPopup {
                         renderPage(pageStarts[pageIndex], pageLayouts[pageIndex])
                     }
                     // 已经到文末时滚轮向下不做任何事，避免出现一页空行
-                } else if (e.wheelRotation < 0) {
+                } else if (rotation < 0) {
                     // 滚轮向上：回到上一页真实记录的起点（而不是当前起点减两页步长）
                     if (pageIndex > 0) {
                         pageIndex--
@@ -172,14 +185,17 @@ class FileContentPopup {
                 }
 
                 if (project != null) {
-                    // 保存下次展示的起点：通常是下一页开头；已经到文末时停在当前页开头
-                    val nextStart = nextPageStart()
-                    val savedPosition = if (nextStart < originalFullContent.length) nextStart else pageStarts[pageIndex]
-                    project.getService(FileStateService::class.java).lastContentPosition = savedPosition
+                    // 保存当前页起点：重开弹窗时回到正在阅读的这一页，而不是跳到下一页
+                    project.getService(FileStateService::class.java).lastContentPosition = pageStarts[pageIndex]
                 }
 
                 e.consume()
             }
+
+            // 注册在多个层级，避免 JScrollPane 或 popup 层吞掉滚轮事件
+            list.addMouseWheelListener(::handleMouseWheel)
+            scrollPane.addMouseWheelListener(::handleMouseWheel)
+            panel.addMouseWheelListener(::handleMouseWheel)
 
             val popup = JBPopupFactory.getInstance()
                 .createComponentPopupBuilder(panel, list)
@@ -190,7 +206,7 @@ class FileContentPopup {
                 .setMovable(true)
                 .createPopup()
 
-            fun updatePopupPosition() {
+            fun updatePopupPosition(followCaret: Boolean = false) {
                 fun isPopupWithinEditorBounds(editor: Editor, popup: JBPopup): Boolean {
                     val editorComponent = editor.component
                     val editorBounds = editorComponent.visibleRect
@@ -211,54 +227,57 @@ class FileContentPopup {
                 }
 
                 runCatching {
-                    val caretModel = editor.caretModel
-                    val visualPos = caretModel.visualPosition
                     val editorComponent = editor.component
-                    val xy = editor.visualPositionToXY(visualPos)
-                    val scrollModel = editor.scrollingModel
-
-                    val screenSize = Toolkit.getDefaultToolkit().screenSize
                     val screenBounds = editorComponent.graphicsConfiguration.bounds
-                    val actualScreenWidth = screenBounds.width
+
+                    val anchorScreenPoint = triggerScreenPoint ?: caretScreenPoint(editor)
 
                     // 先显示一次才能拿到弹窗的真实尺寸
                     if (!popup.isVisible) {
-                        popup.show(RelativePoint.getNorthWestOf(editorComponent))
+                        val editorLocation = editorComponent.locationOnScreen
+                        val desiredScreenX = anchorScreenPoint.x + POPUP_OFFSET_X
+                        val desiredScreenY = anchorScreenPoint.y + POPUP_OFFSET_Y
+                        val popupX = desiredScreenX.coerceIn(
+                            screenBounds.x,
+                            screenBounds.x + screenBounds.width - popupWidth,
+                        )
+                        val popupY = desiredScreenY.coerceIn(
+                            screenBounds.y,
+                            screenBounds.y + screenBounds.height - popupHeight,
+                        )
+                        popup.show(
+                            RelativePoint(
+                                editorComponent,
+                                Point(popupX - editorLocation.x, popupY - editorLocation.y),
+                            ),
+                        )
                     }
 
                     val popupWidth = popup.size.width
                     val popupHeight = popup.size.height
 
-                    val cursorX = xy.x - scrollModel.horizontalScrollOffset
-                    val cursorY = xy.y - scrollModel.verticalScrollOffset
+                    val currentCaretScreenPoint = if (popup.isVisible && followCaret) {
+                        caretScreenPoint(editor)
+                    } else {
+                        anchorScreenPoint
+                    }
 
                     // 默认放在光标右下角
-                    var popupX = cursorX + POPUP_OFFSET_X
-                    var popupY = cursorY + POPUP_OFFSET_Y
+                    var popupX = currentCaretScreenPoint.x + POPUP_OFFSET_X
+                    var popupY = currentCaretScreenPoint.y + POPUP_OFFSET_Y
 
                     // 右侧或底部放不下时翻到光标另一侧，再夹进屏幕范围
-                    if (popupX + popupWidth > actualScreenWidth) {
-                        popupX = maxOf(0, cursorX - popupWidth)
+                    if (popupX + popupWidth > screenBounds.x + screenBounds.width) {
+                        popupX = maxOf(screenBounds.x, currentCaretScreenPoint.x - popupWidth)
                     }
-                    if (popupY + popupHeight > screenSize.height) {
-                        popupY = maxOf(0, cursorY - popupHeight - POPUP_OFFSET_Y)
+                    if (popupY + popupHeight > screenBounds.y + screenBounds.height) {
+                        popupY = maxOf(screenBounds.y, currentCaretScreenPoint.y - popupHeight - POPUP_OFFSET_Y)
                     }
-                    if (popupX < 0) {
-                        popupX = 0
-                    }
-                    if (popupY < 0) {
-                        popupY = 0
-                    }
+                    popupX = popupX.coerceIn(screenBounds.x, screenBounds.x + screenBounds.width - popupWidth)
+                    popupY = popupY.coerceIn(screenBounds.y, screenBounds.y + screenBounds.height - popupHeight)
 
-                    val adjustedPoint = RelativePoint(
-                        editorComponent,
-                        Point(popupX, popupY),
-                    )
-
-                    if (!popup.isVisible) {
-                        popup.show(adjustedPoint)
-                    } else if (isPopupWithinEditorBounds(editor, popup)) {
-                        popup.setLocation(adjustedPoint.screenPoint)
+                    if (popup.isVisible && isPopupWithinEditorBounds(editor, popup)) {
+                        popup.setLocation(Point(popupX, popupY))
                     } else {
                         popup.cancel()
                     }
@@ -267,10 +286,24 @@ class FileContentPopup {
                 }
             }
 
+            val scrollUpdatePending = AtomicBoolean(false)
+
+            fun schedulePopupPositionUpdate() {
+                if (!scrollUpdatePending.compareAndSet(false, true)) {
+                    return
+                }
+
+                UIUtil.invokeLaterIfNeeded {
+                    if (scrollUpdatePending.compareAndSet(true, false) && !popup.isDisposed) {
+                        updatePopupPosition(followCaret = true)
+                    }
+                }
+            }
+
             val scrollingListener = object : VisibleAreaListener {
                 override fun visibleAreaChanged(e: VisibleAreaEvent) {
                     if (!popup.isDisposed) {
-                        updatePopupPosition()
+                        schedulePopupPositionUpdate()
                     }
                 }
             }
@@ -279,12 +312,39 @@ class FileContentPopup {
             popup.addListener(object : JBPopupAdapter() {
                 override fun onClosed(event: LightweightWindowEvent) {
                     editor.scrollingModel.removeVisibleAreaListener(scrollingListener)
+                    onClosed()
                 }
             })
 
             updatePopupPosition()
 
             editor.scrollingModel.addVisibleAreaListener(scrollingListener)
+            return FileContentPopup(popup)
         }
+
+        /**
+         * 光标在屏幕上的位置。读取是异步的，触发点必须在发起读取前捕获，
+         * 否则加载期间光标移动会让弹窗出现在移动后的位置。
+         */
+        fun caretScreenPoint(editor: Editor): Point {
+            val visualPosition = editor.caretModel.visualPosition
+            val editorPoint = editor.visualPositionToXY(visualPosition)
+            return RelativePoint(editor.component, editorPoint).screenPoint
+        }
+
+        private fun fileTypeFor(fileName: String): FileType {
+            val extension = fileName.substringAfterLast('.', "").lowercase()
+            return FileTypeManager.getInstance().getFileTypeByExtension(extension)
+        }
+    }
+
+    private val popup: JBPopup
+
+    private constructor(popup: JBPopup) {
+        this.popup = popup
+    }
+
+    fun close() {
+        popup.cancel()
     }
 }

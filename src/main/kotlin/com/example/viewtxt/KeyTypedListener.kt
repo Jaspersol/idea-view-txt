@@ -8,7 +8,6 @@ import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
-import java.io.File
 import java.util.IdentityHashMap
 import java.util.WeakHashMap
 import javax.swing.JComponent
@@ -136,29 +135,6 @@ class KeyTypedListener : EditorFactoryListener {
     }
 
     private fun handleShortcutTriggered(project: Project, editor: Editor) {
-        val selectedFilePath = project.getService(FileStateService::class.java).lastSelectedFilePath
-        if (selectedFilePath.isEmpty()) {
-            return
-        }
-
-        val file = File(selectedFilePath)
-        if (!file.exists() || file.isDirectory) {
-            return
-        }
-
-        // 读取与解码放在后台线程，大文件不会卡住 EDT；弹窗创建回到 EDT
-        FileContentLoader.readTextAsync(
-            file,
-            onSuccess = { content ->
-                try {
-                    FileContentPopup.show(editor, content, file.name)
-                } catch (ex: Exception) {
-                    ex.printStackTrace()
-                }
-            },
-            onError = { ex ->
-                ex.printStackTrace()
-            },
-        )
+        FileContentPresenter.show(project, editor)
     }
 }

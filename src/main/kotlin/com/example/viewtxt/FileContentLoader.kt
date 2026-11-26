@@ -1,6 +1,8 @@
 package com.example.viewtxt
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.project.Project
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
@@ -20,23 +22,46 @@ object FileContentLoader {
     /** GB18030 是 GBK 的超集，优先用它解码历史中文编码文件 */
     private val GB18030: Charset = Charset.forName("GB18030")
 
+    /** 弹窗阅读场景无需加载超大文件，超过上限时直接提示，避免内存被一次性占满 */
+    const val MAX_FILE_BYTES: Long = 8L * 1024 * 1024
+
     private class Bom(val charset: Charset, val length: Int)
 
     /**
      * 后台读取并解码 [file]，成功和失败回调都在 EDT 上执行。
      * 读取失败（文件被删、无权限等）交给 [onError]，由调用方决定提示方式。
      */
-    fun readTextAsync(file: File, onSuccess: (String) -> Unit, onError: (Throwable) -> Unit) {
+    fun readTextAsync(
+        file: File,
+        project: Project? = null,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+    ) {
         val application = ApplicationManager.getApplication()
         application.executeOnPooledThread {
             try {
+                if (file.length() > MAX_FILE_BYTES) {
+                    throw FileTooLargeException(file.length(), MAX_FILE_BYTES)
+                }
+
                 val content = decode(file.readBytes())
-                application.invokeLater { onSuccess(content) }
+                application.invokeLater({
+                    if (project == null || !project.isDisposed) {
+                        onSuccess(content)
+                    }
+                }, ModalityState.any())
             } catch (ex: Exception) {
-                application.invokeLater { onError(ex) }
+                application.invokeLater({
+                    if (project == null || !project.isDisposed) {
+                        onError(ex)
+                    }
+                }, ModalityState.any())
             }
         }
     }
+
+    class FileTooLargeException(val fileSize: Long, val maxSize: Long) :
+        IllegalStateException("文件过大: $fileSize 字节，当前上限为 $maxSize 字节")
 
     /** 按 BOM → 严格 UTF-8 → GB18030 → 宽松 UTF-8 的顺序解码 */
     fun decode(bytes: ByteArray): String {

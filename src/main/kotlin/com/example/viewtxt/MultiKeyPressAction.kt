@@ -5,8 +5,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.ui.Messages
-import java.io.File
 
 /**
  * Tools 菜单入口：按工具窗口里保存的路径读取文件内容并弹出预览。
@@ -19,60 +17,7 @@ class MultiKeyPressAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val editor = getActiveEditor(e) ?: return
-        val selectedFilePath = project.getService(FileStateService::class.java).lastSelectedFilePath
-
-        if (selectedFilePath.isEmpty()) {
-            Messages.showMessageDialog(
-                project,
-                "没有选择任何文件，请先在工具窗口中选择一个文件。",
-                "无文件可打开",
-                Messages.getWarningIcon(),
-            )
-            return
-        }
-
-        val file = File(selectedFilePath)
-        if (!file.exists()) {
-            Messages.showMessageDialog(
-                project,
-                "文件不存在: $selectedFilePath",
-                "文件错误",
-                Messages.getErrorIcon(),
-            )
-            return
-        }
-
-        if (file.isDirectory) {
-            Messages.showMessageDialog(
-                project,
-                "不能打开目录: $selectedFilePath",
-                "无效路径",
-                Messages.getWarningIcon(),
-            )
-            return
-        }
-
-        // 读取与解码都在后台线程，大文件不会卡住 EDT；弹窗创建回到 EDT 执行
-        fun showReadError(ex: Throwable) {
-            Messages.showMessageDialog(
-                project,
-                "读取文件时出错: ${ex.message}",
-                "读取错误",
-                Messages.getErrorIcon(),
-            )
-        }
-
-        FileContentLoader.readTextAsync(
-            file,
-            onSuccess = { content ->
-                try {
-                    FileContentPopup.show(editor, content, file.name)
-                } catch (ex: Exception) {
-                    showReadError(ex)
-                }
-            },
-            onError = { ex -> showReadError(ex) },
-        )
+        FileContentPresenter.show(project, editor)
     }
 
     override fun update(e: AnActionEvent) {

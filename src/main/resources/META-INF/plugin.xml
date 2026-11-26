@@ -4,18 +4,21 @@
 
     <name>IdeaViewTxt</name>
 
-    <vendor url="">makabaka</vendor>
-
     <description><![CDATA[
         <p>ide内快捷查看文本文件</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
 
+    <!-- 按照插件市场规范提供明确许可声明 -->
+    <vendor url="https://github.com/Jaspersol/idea-view-txt">makabaka</vendor>
+
     <!-- 资源包路径，与 ViewTxtBundle.kt 中的 BUNDLE 常量保持一致 -->
     <resource-bundle>messages.ViewTxtBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="ViewTxt" displayType="BALLOON"/>
+
         <!-- 工具窗口 id 被 ViewTxtBundle.properties 的 toolwindow.stripe.MyToolWindow 引用，不可随意改 -->
         <toolWindow id="MyToolWindow" factoryClass="com.example.viewtxt.ViewTxtToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>

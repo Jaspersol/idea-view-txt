@@ -227,28 +227,29 @@ class FileContentPopup {
                 }
 
                 runCatching {
+                    if (popup.isDisposed) {
+                        return
+                    }
+
                     val editorComponent = editor.component
                     val screenBounds = editorComponent.graphicsConfiguration.bounds
+                    val editorLocation = editorComponent.locationOnScreen
 
                     val anchorScreenPoint = triggerScreenPoint ?: caretScreenPoint(editor)
+                    val currentCaretScreenPoint = if (popup.isVisible && followCaret) {
+                        caretScreenPoint(editor)
+                    } else {
+                        anchorScreenPoint
+                    }
 
-                    // 先显示一次才能拿到弹窗的真实尺寸
                     if (!popup.isVisible) {
-                        val editorLocation = editorComponent.locationOnScreen
-                        val desiredScreenX = anchorScreenPoint.x + POPUP_OFFSET_X
-                        val desiredScreenY = anchorScreenPoint.y + POPUP_OFFSET_Y
-                        val popupX = desiredScreenX.coerceIn(
-                            screenBounds.x,
-                            screenBounds.x + screenBounds.width - popupWidth,
-                        )
-                        val popupY = desiredScreenY.coerceIn(
-                            screenBounds.y,
-                            screenBounds.y + screenBounds.height - popupHeight,
-                        )
                         popup.show(
                             RelativePoint(
                                 editorComponent,
-                                Point(popupX - editorLocation.x, popupY - editorLocation.y),
+                                Point(
+                                    currentCaretScreenPoint.x - editorLocation.x,
+                                    currentCaretScreenPoint.y - editorLocation.y,
+                                ),
                             ),
                         )
                     }
@@ -256,17 +257,9 @@ class FileContentPopup {
                     val popupWidth = popup.size.width
                     val popupHeight = popup.size.height
 
-                    val currentCaretScreenPoint = if (popup.isVisible && followCaret) {
-                        caretScreenPoint(editor)
-                    } else {
-                        anchorScreenPoint
-                    }
-
-                    // 默认放在光标右下角
                     var popupX = currentCaretScreenPoint.x + POPUP_OFFSET_X
                     var popupY = currentCaretScreenPoint.y + POPUP_OFFSET_Y
 
-                    // 右侧或底部放不下时翻到光标另一侧，再夹进屏幕范围
                     if (popupX + popupWidth > screenBounds.x + screenBounds.width) {
                         popupX = maxOf(screenBounds.x, currentCaretScreenPoint.x - popupWidth)
                     }
@@ -276,7 +269,14 @@ class FileContentPopup {
                     popupX = popupX.coerceIn(screenBounds.x, screenBounds.x + screenBounds.width - popupWidth)
                     popupY = popupY.coerceIn(screenBounds.y, screenBounds.y + screenBounds.height - popupHeight)
 
-                    if (popup.isVisible && isPopupWithinEditorBounds(editor, popup)) {
+                    if (!popup.isVisible) {
+                        popup.show(
+                            RelativePoint(
+                                editorComponent,
+                                Point(popupX - editorLocation.x, popupY - editorLocation.y),
+                            ),
+                        )
+                    } else if (isPopupWithinEditorBounds(editor, popup)) {
                         popup.setLocation(Point(popupX, popupY))
                     } else {
                         popup.cancel()
